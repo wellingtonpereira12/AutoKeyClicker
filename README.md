@@ -66,10 +66,10 @@ Um software profissional, leve e ultra-responsivo de repetição automática de 
    - Ajuste de intervalo em **milissegundos (ms)** ou **segundos (s)**.
    - **Proteção Anti-Ban / Jitter**: Opção de micro-variação humana (±25ms) para evitar padrões robóticos perfeitamente estáticos detectados por anti-cheats.
 
-8. **Atalhos Globais (Hotkeys)**:
-   - **F6**: Iniciar
-   - **F7**: Parar
-   - Funcionam de qualquer lugar: mesmo se você estiver em tela cheia no jogo ou em outra tela.
+8. **Tecla Única de Atalho Configurável (Toggle Iniciar/Parar) (Novo!)**:
+   - Um **único botão configurável** para alternar: se apertar inicia, se apertar novamente para!
+   - Totalmente personalizável na aba **Opções** (ex: `F6`, `F7`, `F8`, `F12`, `INSERT`, `HOME`, `PAUSE`, etc.).
+   - Funciona globalmente em segundo plano, mesmo com o jogo em tela cheia.
 
 9. **Painel Flutuante (Always on Top)**:
    - Mantenha a janelinha fixada em um canto da sua tela secundária enquanto joga.
@@ -107,8 +107,8 @@ python main.py
 4. Em **2. Tecla para Clicar Repetidamente**, escolha a tecla desejada (ex: `F10`).
 5. Em **3. Intervalo / Tempo de Repetição**, defina o tempo (ex: `500 ms`).
 6. Deixe marcado **Modo Segundo Plano** para não atrapalhar seu mouse em outras telas.
-7. Pressione o botão verde **INICIAR** ou a tecla **F6** no teclado.
-8. Para parar quando quiser, aperte **F7** ou clique em **PARAR**.
+7. Pressione o botão verde **INICIAR** ou a tecla de atalho configurada (ex: **F6**) no teclado.
+8. Para parar quando quiser, aperte a mesma tecla de atalho (ex: **F6**) ou clique em **PARAR**.
 
 ---
 

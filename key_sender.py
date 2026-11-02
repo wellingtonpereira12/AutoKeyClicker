@@ -49,6 +49,16 @@ KEY_MAP = {
     'SHIFT': 0x10,
     'CTRL': 0x11,
     'ALT': 0x12,
+    'INSERT': 0x2D,
+    'DELETE': 0x2E,
+    'HOME': 0x24,
+    'END': 0x23,
+    'PAGE_UP': 0x21, 'PGUP': 0x21,
+    'PAGE_DOWN': 0x22, 'PGDN': 0x22,
+    'PAUSE': 0x13,
+    'SCROLL_LOCK': 0x91,
+    'CAPSLOCK': 0x14,
+    'TILDE': 0xC0, '`': 0xC0,
 
     # Arrows
     'UP': 0x26, 'DOWN': 0x28, 'LEFT': 0x25, 'RIGHT': 0x27,

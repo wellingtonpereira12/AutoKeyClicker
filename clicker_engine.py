@@ -15,11 +15,12 @@ from window_manager import is_window_alive, activate_window
 user32 = ctypes.windll.user32
 
 class ClickerEngine:
-    def __init__(self, on_tick=None, on_state_change=None, on_hotkey_start=None, on_hotkey_stop=None):
+    def __init__(self, on_tick=None, on_state_change=None, on_hotkey_start=None, on_hotkey_stop=None, on_hotkey_toggle=None):
         self.on_tick = on_tick  # callback(clicks_count, elapsed_seconds)
         self.on_state_change = on_state_change  # callback(is_running, message)
         self.on_hotkey_start = on_hotkey_start
         self.on_hotkey_stop = on_hotkey_stop
+        self.on_hotkey_toggle = on_hotkey_toggle
         
         self.is_running = False
         self._stop_event = threading.Event()
@@ -45,8 +46,9 @@ class ClickerEngine:
         self.jitter_enabled = True
         self.jitter_range = 25  # +/- 25ms random jitter
         self.mode = "background"  # 'background' or 'foreground'
-        self.hotkey_start_vk = 0x75  # F6
-        self.hotkey_stop_vk = 0x76   # F7
+        self.hotkey_toggle_vk = 0x75  # F6 (single key for toggle start/stop)
+        self.hotkey_start_vk = 0x75  # F6 (fallback)
+        self.hotkey_stop_vk = None   # None (unified single toggle key)
 
         # Stats
         self.clicks_count = 0
@@ -65,7 +67,11 @@ class ClickerEngine:
         self.jitter_enabled = jitter_enabled
         self.collision_pause_sec = max(0.1, float(collision_pause))
 
-    def set_hotkeys(self, start_vk, stop_vk):
+    def set_hotkey_toggle(self, vk):
+        self.hotkey_toggle_vk = vk
+
+    def set_hotkeys(self, start_vk, stop_vk=None):
+        self.hotkey_toggle_vk = start_vk
         self.hotkey_start_vk = start_vk
         self.hotkey_stop_vk = stop_vk
 
@@ -299,28 +305,30 @@ class ClickerEngine:
                 break
 
     def _hotkey_loop(self):
-        """Watches for global hotkeys across all screens/games using GetAsyncKeyState."""
-        was_start_pressed = False
+        """Watches for global single toggle hotkey across all screens/games using GetAsyncKeyState."""
+        was_toggle_pressed = False
         was_stop_pressed = False
 
         while self._hotkey_running:
             try:
-                # Start Hotkey Check (F6)
-                if self.hotkey_start_vk:
-                    start_state = bool(user32.GetAsyncKeyState(self.hotkey_start_vk) & 0x8000)
-                    if start_state and not was_start_pressed:
+                # Unified Toggle Hotkey Check (Single button for start/stop)
+                if self.hotkey_toggle_vk:
+                    toggle_state = bool(user32.GetAsyncKeyState(self.hotkey_toggle_vk) & 0x8000)
+                    if toggle_state and not was_toggle_pressed:
                         # Rising edge
-                        if self.on_hotkey_start:
-                            self.on_hotkey_start()
+                        if self.on_hotkey_toggle:
+                            self.on_hotkey_toggle()
                         else:
-                            self.start()
-                    was_start_pressed = start_state
+                            if self.is_running:
+                                self.stop("Parado via tecla de atalho")
+                            else:
+                                self.start()
+                    was_toggle_pressed = toggle_state
 
-                # Stop Hotkey Check (F7)
-                if self.hotkey_stop_vk:
+                # Optional secondary stop hotkey check (if separately configured)
+                if self.hotkey_stop_vk and self.hotkey_stop_vk != self.hotkey_toggle_vk:
                     stop_state = bool(user32.GetAsyncKeyState(self.hotkey_stop_vk) & 0x8000)
                     if stop_state and not was_stop_pressed:
-                        # Rising edge
                         if self.on_hotkey_stop:
                             self.on_hotkey_stop()
                         else:

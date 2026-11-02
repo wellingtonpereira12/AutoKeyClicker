@@ -11,7 +11,7 @@ import json
 import ctypes
 
 from window_manager import list_user_windows, is_window_alive
-from key_sender import KEY_MAP
+from key_sender import KEY_MAP, resolve_key
 from clicker_engine import ClickerEngine
 
 # Enable DPI Awareness on Windows
@@ -41,6 +41,17 @@ COMMON_KEYS = [
     "A", "S", "D", "F", "G", "H",
     "Z", "X", "C", "V", "B",
     "MOUSE_LEFT", "MOUSE_RIGHT"
+]
+
+AVAILABLE_HOTKEYS = [
+    "F6", "F7", "F8", "F9", "F10", "F11", "F12",
+    "F1", "F2", "F3", "F4", "F5",
+    "PAUSE", "INSERT", "HOME", "END", "PAGE_UP", "PAGE_DOWN", "DELETE",
+    "SPACE", "TAB", "`",
+    "Q", "W", "E", "R", "T", "Y",
+    "A", "S", "D", "F", "G", "H",
+    "Z", "X", "C", "V", "B",
+    "1", "2", "3", "4", "5", "6", "7", "8", "9", "0"
 ]
 
 def get_setups_file_path():
@@ -105,8 +116,9 @@ class AutoKeyClickerApp:
         self.engine = ClickerEngine(
             on_tick=self._on_tick_callback,
             on_state_change=self._on_state_change_callback,
-            on_hotkey_start=self._on_hotkey_start_callback,
-            on_hotkey_stop=self._on_hotkey_stop_callback
+            on_hotkey_start=self._on_hotkey_toggle_callback,
+            on_hotkey_stop=self._on_hotkey_toggle_callback,
+            on_hotkey_toggle=self._on_hotkey_toggle_callback
         )
 
         self.windows_cache = []
@@ -359,7 +371,7 @@ class AutoKeyClickerApp:
 
         self.btn_stop = tk.Button(
             btn_row,
-            text="⏹ PARAR (F7)",
+            text="⏹ PARAR (F6)",
             command=self.stop_clicker,
             font=("Segoe UI", 10, "bold"),
             bg=ACCENT_RED,
@@ -517,12 +529,34 @@ class AutoKeyClickerApp:
             font=("Segoe UI", 8, "bold"), bg=BG_CARD, fg=ACCENT_GREEN
         ).pack(side="left")
 
+        # Configuração do Botão Único de Iniciar/Parar (Toggle)
+        hk_frame = tk.Frame(p_card, bg=BG_CARD)
+        hk_frame.pack(fill="x", pady=(8, 2))
+
+        tk.Label(
+            hk_frame,
+            text="⌨️ Tecla Única (Iniciar / Parar):",
+            font=("Segoe UI", 8, "bold"), bg=BG_CARD, fg=FG_WHITE
+        ).pack(side="left")
+
+        self.hotkey_var = tk.StringVar(value="F6")
+        self.hotkey_combo = ttk.Combobox(
+            hk_frame,
+            textvariable=self.hotkey_var,
+            values=AVAILABLE_HOTKEYS,
+            width=7,
+            state="readonly",
+            font=("Segoe UI", 8, "bold")
+        )
+        self.hotkey_combo.pack(side="left", padx=6)
+        self.hotkey_combo.bind("<<ComboboxSelected>>", self._on_hotkey_changed)
+
         lbl_hk = tk.Label(
             p_card,
-            text="⌨️ Teclas Globais: F6 = Iniciar | F7 = Parar (Funcionam em qualquer tela)",
-            font=("Segoe UI", 8, "bold"), bg=BG_CARD, fg=ACCENT_BLUE
+            text="💡 Um único botão para as duas funções: se apertar inicia, se apertar de novo para.",
+            font=("Segoe UI", 7, "italic"), bg=BG_CARD, fg=ACCENT_BLUE
         )
-        lbl_hk.pack(anchor="w", pady=4)
+        lbl_hk.pack(anchor="w", pady=(1, 4))
 
     def _create_card(self, parent, title):
         card = tk.LabelFrame(
@@ -905,11 +939,31 @@ class AutoKeyClickerApp:
 
         self.root.after(33, self._animate_tubinhos)
 
+    def _on_hotkey_toggle_callback(self):
+        self.root.after(0, self._toggle_clicker)
+
+    def _toggle_clicker(self):
+        """Single button toggle: starts if stopped, stops if running."""
+        if self.engine.is_running:
+            self.stop_clicker()
+        else:
+            self.start_clicker()
+
     def _on_hotkey_start_callback(self):
         self.root.after(0, self.start_clicker)
 
     def _on_hotkey_stop_callback(self):
         self.root.after(0, self.stop_clicker)
+
+    def _on_hotkey_changed(self, event=None):
+        hk = self.hotkey_var.get().strip().upper()
+        if not hk:
+            hk = "F6"
+            self.hotkey_var.set(hk)
+        vk, _ = resolve_key(hk)
+        self.engine.set_hotkey_toggle(vk)
+        self.btn_start.config(text=f"▶ INICIAR ({hk})")
+        self.btn_stop.config(text=f"⏹ PARAR ({hk})")
 
     # ----------------- SETUPS (SALVAR / CARREGAR) -----------------
     def load_setups_from_disk(self):
@@ -996,6 +1050,7 @@ class AutoKeyClickerApp:
             "mode": self.mode_var.get(),
             "jitter": self.jitter_var.get(),
             "collision_delay": self.collision_delay_var.get() if hasattr(self, 'collision_delay_var') else "3.0",
+            "hotkey": self.hotkey_var.get() if hasattr(self, 'hotkey_var') else "F6",
             "keys": keys_data
         }
 
@@ -1015,6 +1070,9 @@ class AutoKeyClickerApp:
         self.jitter_var.set(setup_data.get('jitter', True))
         if hasattr(self, 'collision_delay_var'):
             self.collision_delay_var.set(str(setup_data.get('collision_delay', '3.0')))
+        if hasattr(self, 'hotkey_var'):
+            self.hotkey_var.set(setup_data.get('hotkey', 'F6'))
+            self._on_hotkey_changed(None)
 
         for cd in list(self.key_cards):
             cd['frame'].destroy()
