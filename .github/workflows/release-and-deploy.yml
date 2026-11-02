@@ -18,14 +18,14 @@ permissions:
 
 jobs:
   deploy:
-    name: Deploy Website & Executable to VPS
+    name: Deploy to VPS (Docker & SSL)
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Deploy to VPS via SCP
+      - name: Deploy to VPS via SCP & Docker
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
@@ -35,16 +35,23 @@ jobs:
           echo "Installing sshpass..."
           sudo apt-get update -qq && sudo apt-get install -y -qq sshpass
           
-          echo "Deploying landing page and AutoKeyClicker.exe to VPS..."
-          sshpass -p "$VPS_PASS" scp -P "$VPS_PORT" -o StrictHostKeyChecking=no \
-            web/index.html web/logo.png AutoKeyClicker.exe \
-            ${VPS_USER}@${VPS_HOST}:/var/www/html/
-            
-          echo "Setting permissions on VPS..."
+          echo "Uploading Docker files, web assets and executable to VPS..."
           sshpass -p "$VPS_PASS" ssh -p "$VPS_PORT" -o StrictHostKeyChecking=no \
-            ${VPS_USER}@${VPS_HOST} "chmod 644 /var/www/html/index.html /var/www/html/logo.png /var/www/html/AutoKeyClicker.exe && systemctl reload nginx"
+            ${VPS_USER}@${VPS_HOST} "mkdir -p /root/autokeyclicker/web"
             
-          echo "Deployment completed successfully! Live at http://${VPS_HOST}/"
+          sshpass -p "$VPS_PASS" scp -P "$VPS_PORT" -o StrictHostKeyChecking=no \
+            Dockerfile docker-compose.yml AutoKeyClicker.exe \
+            ${VPS_USER}@${VPS_HOST}:/root/autokeyclicker/
+            
+          sshpass -p "$VPS_PASS" scp -P "$VPS_PORT" -o StrictHostKeyChecking=no \
+            web/index.html web/logo.png \
+            ${VPS_USER}@${VPS_HOST}:/root/autokeyclicker/web/
+            
+          echo "Rebuilding and updating Docker container on VPS..."
+          sshpass -p "$VPS_PASS" ssh -p "$VPS_PORT" -o StrictHostKeyChecking=no \
+            ${VPS_USER}@${VPS_HOST} "cd /root/autokeyclicker && docker compose up -d --build && nginx -t && systemctl reload nginx"
+            
+          echo "Deployment completed! Site live at https://autokeyclicker.pampo.tech/"
 
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
@@ -57,6 +64,9 @@ jobs:
             
             Multi-Screen & Multi-Key Background Auto-Clicker projetado para jogos e MMOs.
             
+            ### 🌐 Site Oficial & Download:
+            - **URL Segura**: [https://autokeyclicker.pampo.tech/](https://autokeyclicker.pampo.tech/)
+            
             ### ✨ Recursos e Novidades:
             - **Anti-Collision Inteligente**: Evita sobreposição de cliques entre teclas diferentes com delay configurável.
             - **Tubinhos Animados de Cooldown**: Feedback visual em tempo real (Azul = Recarregando, Amarelo = Aguardando delay, Verde = Clique).
@@ -66,6 +76,6 @@ jobs:
             - **Modo Segundo Plano (Background)**: Envia teclas via PostMessage sem roubar o foco ou a janela.
             
             ### ⬇ Download Direto:
-            - Baixe o executável abaixo ou acerte pelo site: [http://${{ secrets.VPS_HOST }}/](http://${{ secrets.VPS_HOST }}/)
+            - Baixe o **AutoKeyClicker.exe** anexo nesta release ou pelo site oficial.
           draft: false
           prerelease: false

@@ -1,0 +1,7 @@
+services:
+  autokeyclicker:
+    build: .
+    container_name: autokeyclicker
+    restart: always
+    ports:
+      - "3160:80"

@@ -1,12 +1,13 @@
 # ⚡ Auto Key Clicker (Multi-Monitor & Gaming Edition)
 
 [![Release](https://img.shields.io/badge/Release-v1.0.0-blue.svg)](https://github.com/wellingtonpereira12/AutoKeyClicker/releases)
-[![Download](https://img.shields.io/badge/Download-AutoKeyClicker.exe-success.svg)](http://187.127.17.88/)
+[![Download](https://img.shields.io/badge/Download-AutoKeyClicker.exe-success.svg)](https://autokeyclicker.pampo.tech/)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011%20(64--bit)-lightgrey.svg)]()
+[![SSL](https://img.shields.io/badge/HTTPS-Secure%20Lock-green.svg)](https://autokeyclicker.pampo.tech/)
 
 Um software profissional, leve e ultra-responsivo de repetição automática de teclas (**Auto-Clicker de Teclado**), desenvolvido especificamente para jogos e ambientes com **múltiplas telas (multitelas)**.
 
-🌐 **Site Oficial & Download**: [http://187.127.17.88/](http://187.127.17.88/)
+🌐 **Site Oficial & Download Seguro (HTTPS)**: [https://autokeyclicker.pampo.tech/](https://autokeyclicker.pampo.tech/)
 
 ---
 
