@@ -1,9 +1,10 @@
 {
   "Farm Ragnarok F10": {
     "name": "Farm Ragnarok F10",
-    "mode": "foreground",
+    "mode": "background",
     "jitter": true,
     "collision_delay": "3.0",
+    "hotkey": "F6",
     "keys": [
       {
         "key": "F1",
@@ -32,6 +33,7 @@
     "mode": "background",
     "jitter": true,
     "collision_delay": "3.0",
+    "hotkey": "F6",
     "keys": [
       {
         "key": "1",
@@ -52,9 +54,10 @@
   },
   "TESTE": {
     "name": "TESTE",
-    "mode": "foreground",
+    "mode": "background",
     "jitter": true,
     "collision_delay": "3.0",
+    "hotkey": "F6",
     "keys": [
       {
         "key": "F1",
@@ -75,9 +78,10 @@
   },
   "d": {
     "name": "d",
-    "mode": "foreground",
+    "mode": "background",
     "jitter": true,
     "collision_delay": "3.0",
+    "hotkey": "F6",
     "keys": [
       {
         "key": "F1",

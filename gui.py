@@ -475,7 +475,7 @@ class AutoKeyClickerApp:
 
         rb_bg = tk.Radiobutton(
             m_card,
-            text="Modo Segundo Plano (PostMessage) — Recomendado\n(Clica no jogo sem roubar seu foco ou cursor em outras telas)",
+            text="Modo Segundo Plano (PostMessage) — Recomendado\n(NÃO puxa a tela nem rouba foco: você mexe em outros programas livremente)",
             variable=self.mode_var, value="background", justify="left",
             bg=BG_CARD, fg=FG_WHITE, selectcolor=BG_INPUT,
             activebackground=BG_CARD, activeforeground=FG_WHITE, font=("Segoe UI", 8)
@@ -484,7 +484,7 @@ class AutoKeyClickerApp:
 
         rb_fg = tk.Radiobutton(
             m_card,
-            text="Modo Foco Ativo (SendInput / DirectInput)\n(Traz a janela para a frente e envia scancodes diretos)",
+            text="Modo Foco Ativo (SendInput / DirectInput)\n(Puxa a tela do jogo para a frente a cada clique para enviar scancodes diretos)",
             variable=self.mode_var, value="foreground", justify="left",
             bg=BG_CARD, fg=FG_WHITE, selectcolor=BG_INPUT,
             activebackground=BG_CARD, activeforeground=FG_WHITE, font=("Segoe UI", 8)
@@ -1210,7 +1210,8 @@ class AutoKeyClickerApp:
                 if is_running:
                     target_exe = self.selected_window['exe'] if self.selected_window else 'Jogo'
                     active_count = len(self._get_configured_keys())
-                    status_txt = f"● ATIVO ({active_count}T)" if self.is_mini_mode else f"● CLICANDO ({active_count} TECLAS) EM {target_exe}"
+                    mode_tag = " [2º Plano]" if self.mode_var.get() == "background" else " [Foco Ativo]"
+                    status_txt = f"● ATIVO ({active_count}T){mode_tag}" if self.is_mini_mode else f"● CLICANDO ({active_count} TECLAS) EM {target_exe}{mode_tag}"
                     self.status_badge.config(
                         text=status_txt,
                         fg=ACCENT_GREEN

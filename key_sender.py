@@ -9,6 +9,20 @@ import time
 
 user32 = ctypes.windll.user32
 
+# Ensure connection to interactive desktop
+def ensure_interactive_desktop():
+    try:
+        hwinsta = user32.OpenWindowStationW('WinSta0', False, 0x10000000)
+        if hwinsta:
+            user32.SetProcessWindowStation(hwinsta)
+            hdesk = user32.OpenDesktopW('Default', 0, False, 0x10000000)
+            if hdesk:
+                user32.SetThreadDesktop(hdesk)
+    except Exception:
+        pass
+
+ensure_interactive_desktop()
+
 # Windows Constants
 WM_KEYDOWN = 0x0100
 WM_KEYUP = 0x0101
@@ -135,6 +149,7 @@ def send_key_background(hwnd, key_str, hold_ms=35):
     Sends a keystroke directly to a window handle in the BACKGROUND.
     Does not steal focus or move the cursor!
     """
+    ensure_interactive_desktop()
     if not user32.IsWindow(hwnd):
         return False
 
@@ -156,12 +171,13 @@ def send_key_background(hwnd, key_str, hold_ms=35):
     # Windows lParam packing:
     # Bits 0-15: Repeat count (1)
     # Bits 16-23: Scan code
-    # Bit 24: Extended key flag (0)
+    # Bit 24: Extended key flag (1 for extended keys like Insert, Delete, arrows)
     # Bit 29: Context code (0)
     # Bit 30: Previous key state (0 for down, 1 for up)
     # Bit 31: Transition state (0 for down, 1 for up)
-    lparam_down = 1 | (scancode << 16)
-    lparam_up = 1 | (scancode << 16) | (1 << 30) | (1 << 31)
+    ext_flag = (1 << 24) if vk in (0x2D, 0x2E, 0x24, 0x23, 0x21, 0x22, 0x26, 0x28, 0x25, 0x27) else 0
+    lparam_down = 1 | (scancode << 16) | ext_flag
+    lparam_up = 1 | (scancode << 16) | ext_flag | (1 << 30) | (1 << 31)
 
     user32.PostMessageW(hwnd, WM_KEYDOWN, vk, lparam_down)
     time.sleep(hold_ms / 1000.0)

@@ -1,7 +1,8 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+
 a = Analysis(
-    ['main.py'],
+    ['gui.py'],
     pathex=[],
     binaries=[],
     datas=[('app_icon.ico', '.')],
