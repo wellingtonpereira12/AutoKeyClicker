@@ -1,0 +1,94 @@
+{
+  "Farm Ragnarok F10": {
+    "name": "Farm Ragnarok F10",
+    "mode": "foreground",
+    "jitter": true,
+    "collision_delay": "3.0",
+    "keys": [
+      {
+        "key": "F1",
+        "time": "20",
+        "unit": "s"
+      },
+      {
+        "key": "F2",
+        "time": "14",
+        "unit": "s"
+      },
+      {
+        "key": "F3",
+        "time": "8",
+        "unit": "s"
+      }
+    ]
+  },
+  "Auto Pot & Buffs": {
+    "name": "Auto Pot & Buffs",
+    "mode": "background",
+    "jitter": true,
+    "collision_delay": "3.0",
+    "keys": [
+      {
+        "key": "1",
+        "time": "250",
+        "unit": "ms"
+      },
+      {
+        "key": "2",
+        "time": "1500",
+        "unit": "ms"
+      },
+      {
+        "key": "SPACE",
+        "time": "3000",
+        "unit": "ms"
+      }
+    ]
+  },
+  "TESTE": {
+    "name": "TESTE",
+    "mode": "foreground",
+    "jitter": true,
+    "collision_delay": "3.0",
+    "keys": [
+      {
+        "key": "F1",
+        "time": "19",
+        "unit": "s"
+      },
+      {
+        "key": "F2",
+        "time": "13",
+        "unit": "s"
+      },
+      {
+        "key": "F3",
+        "time": "7",
+        "unit": "s"
+      }
+    ]
+  },
+  "d": {
+    "name": "d",
+    "mode": "foreground",
+    "jitter": true,
+    "collision_delay": "3.0",
+    "keys": [
+      {
+        "key": "F1",
+        "time": "19",
+        "unit": "s"
+      },
+      {
+        "key": "F2",
+        "time": "13",
+        "unit": "s"
+      },
+      {
+        "key": "F3",
+        "time": "7",
+        "unit": "s"
+      }
+    ]
+  }
+}

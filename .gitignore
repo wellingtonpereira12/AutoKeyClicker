@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.spec.bak
+
+# PyInstaller builds
+build/
+dist/
+
+# Test and scratch files
+.test_write
+test_*.py
+check_*.py
+deploy_*.py
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

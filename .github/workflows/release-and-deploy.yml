@@ -1,0 +1,71 @@
+name: Release & Deploy to VPS
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Tag de versão para release manual (ex: v1.0.1)'
+        required: false
+        default: 'v1.0.0'
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    name: Deploy Website & Executable to VPS
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Deploy to VPS via SCP
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PASS: ${{ secrets.VPS_PASSWORD }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+        run: |
+          echo "Installing sshpass..."
+          sudo apt-get update -qq && sudo apt-get install -y -qq sshpass
+          
+          echo "Deploying landing page and AutoKeyClicker.exe to VPS..."
+          sshpass -p "$VPS_PASS" scp -P "$VPS_PORT" -o StrictHostKeyChecking=no \
+            web/index.html web/logo.png AutoKeyClicker.exe \
+            ${VPS_USER}@${VPS_HOST}:/var/www/html/
+            
+          echo "Setting permissions on VPS..."
+          sshpass -p "$VPS_PASS" ssh -p "$VPS_PORT" -o StrictHostKeyChecking=no \
+            ${VPS_USER}@${VPS_HOST} "chmod 644 /var/www/html/index.html /var/www/html/logo.png /var/www/html/AutoKeyClicker.exe && systemctl reload nginx"
+            
+          echo "Deployment completed successfully! Live at http://${VPS_HOST}/"
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: AutoKeyClicker.exe
+          name: Auto Key Clicker ${{ github.ref_name }}
+          body: |
+            ## 🚀 Auto Key Clicker ${{ github.ref_name }}
+            
+            Multi-Screen & Multi-Key Background Auto-Clicker projetado para jogos e MMOs.
+            
+            ### ✨ Recursos e Novidades:
+            - **Anti-Collision Inteligente**: Evita sobreposição de cliques entre teclas diferentes com delay configurável.
+            - **Tubinhos Animados de Cooldown**: Feedback visual em tempo real (Azul = Recarregando, Amarelo = Aguardando delay, Verde = Clique).
+            - **Disparo Inicial Ordenado**: Todas as teclas começam prontas em amarelo e disparam em ordem (F1, depois F2, depois F3...).
+            - **Modo Mini HUD**: Janela compacta e flutuante para manter sobre o jogo.
+            - **Dark Mode Nativo**: Borda e barra de título integradas ao tema escuro do Windows.
+            - **Modo Segundo Plano (Background)**: Envia teclas via PostMessage sem roubar o foco ou a janela.
+            
+            ### ⬇ Download Direto:
+            - Baixe o executável abaixo ou acerte pelo site: [http://${{ secrets.VPS_HOST }}/](http://${{ secrets.VPS_HOST }}/)
+          draft: false
+          prerelease: false

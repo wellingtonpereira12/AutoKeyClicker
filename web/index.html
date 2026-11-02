@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Auto Key Clicker - Download Oficial</title>
+  <meta name="description" content="Download oficial do Auto Key Clicker para Windows. Multi-Screen & Multi-Key Background Game Auto-Clicker com Anti-Collision e Modo Mini.">
+  <link rel="icon" type="image/png" href="logo.png">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+
+    body {
+      background-color: #ffffff;
+      color: #111827;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 20px;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .container {
+      max-width: 680px;
+      width: 100%;
+      text-align: center;
+      margin: auto;
+    }
+
+    .logo-wrapper {
+      margin-bottom: 24px;
+      display: inline-block;
+      position: relative;
+    }
+
+    .logo {
+      width: 110px;
+      height: 110px;
+      border-radius: 28px;
+      box-shadow: 0 12px 30px rgba(88, 101, 242, 0.22);
+      transition: transform 0.25s ease;
+    }
+
+    .logo:hover {
+      transform: scale(1.05);
+    }
+
+    .version-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 14px;
+      border-radius: 9999px;
+      background-color: #f3f4f6;
+      color: #4b5563;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-bottom: 16px;
+      letter-spacing: 0.3px;
+    }
+
+    .version-badge .dot {
+      width: 8px;
+      height: 8px;
+      background-color: #10b981;
+      border-radius: 50%;
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      font-weight: 800;
+      color: #0f172a;
+      letter-spacing: -0.03em;
+      margin-bottom: 12px;
+      line-height: 1.15;
+    }
+
+    .subtitle {
+      font-size: 1.15rem;
+      color: #64748b;
+      margin-bottom: 32px;
+      line-height: 1.6;
+      font-weight: 400;
+    }
+
+    .download-section {
+      margin-bottom: 40px;
+    }
+
+    .btn-download {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background-color: #5865f2;
+      color: #ffffff;
+      text-decoration: none;
+      padding: 18px 48px;
+      border-radius: 16px;
+      font-weight: 700;
+      font-size: 1.2rem;
+      box-shadow: 0 10px 25px rgba(88, 101, 242, 0.35);
+      transition: all 0.2s ease;
+      cursor: pointer;
+      border: none;
+    }
+
+    .btn-download:hover {
+      background-color: #4752c4;
+      transform: translateY(-2px);
+      box-shadow: 0 14px 30px rgba(88, 101, 242, 0.45);
+    }
+
+    .btn-download:active {
+      transform: translateY(0);
+    }
+
+    .btn-download .btn-subtext {
+      font-size: 0.82rem;
+      font-weight: 500;
+      opacity: 0.9;
+      margin-top: 4px;
+    }
+
+    .meta-info {
+      margin-top: 14px;
+      font-size: 0.88rem;
+      color: #94a3b8;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+    }
+
+    .meta-info span {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      text-align: left;
+      margin-top: 40px;
+      padding-top: 36px;
+      border-top: 1px solid #f1f5f9;
+    }
+
+    .feature-card {
+      padding: 18px;
+      border-radius: 14px;
+      background: #fafafa;
+      border: 1px solid #f1f5f9;
+      transition: border-color 0.2s ease, transform 0.2s ease;
+    }
+
+    .feature-card:hover {
+      border-color: #e2e8f0;
+      transform: translateY(-2px);
+    }
+
+    .feature-icon {
+      font-size: 1.5rem;
+      margin-bottom: 8px;
+    }
+
+    .feature-title {
+      font-size: 0.98rem;
+      font-weight: 700;
+      color: #1e293b;
+      margin-bottom: 4px;
+    }
+
+    .feature-desc {
+      font-size: 0.85rem;
+      color: #64748b;
+      line-height: 1.5;
+    }
+
+    .hotkeys-card {
+      margin-top: 24px;
+      background: #f8fafc;
+      border-radius: 14px;
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-around;
+      border: 1px solid #e2e8f0;
+    }
+
+    .hotkey-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.92rem;
+      color: #334155;
+    }
+
+    .kbd {
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      box-shadow: 0 2px 0 #cbd5e1;
+      border-radius: 6px;
+      padding: 3px 8px;
+      font-family: monospace;
+      font-weight: 700;
+      font-size: 0.9rem;
+      color: #0f172a;
+    }
+
+    footer {
+      margin-top: 50px;
+      font-size: 0.85rem;
+      color: #94a3b8;
+      text-align: center;
+    }
+
+    footer a {
+      color: #5865f2;
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    footer a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+
+  <main class="container">
+    <div class="logo-wrapper">
+      <img src="logo.png" alt="Auto Key Clicker Logo" class="logo">
+    </div>
+
+    <div class="version-badge">
+      <span class="dot"></span>
+      <span>Versão 1.0.0 Oficial</span>
+    </div>
+
+    <h1>Auto Key Clicker</h1>
+    <p class="subtitle">Multi-Screen & Multi-Key Background Auto-Clicker projetado para jogos e MMOs. Leve, rápido e portátil.</p>
+
+    <div class="download-section">
+      <a href="AutoKeyClicker.exe" download="AutoKeyClicker.exe" class="btn-download">
+        <span>⬇ Baixar para Windows</span>
+        <span class="btn-subtext">AutoKeyClicker.exe • Versão 1.0.0 (64-bit)</span>
+      </a>
+
+      <div class="meta-info">
+        <span>📦 ~8.6 MB</span>
+        <span>•</span>
+        <span>⚡ 100% Portátil (Sem instalação)</span>
+        <span>•</span>
+        <span>🛡️ Seguro & Limpo</span>
+      </div>
+    </div>
+
+    <div class="hotkeys-card">
+      <div class="hotkey-item">
+        <span class="kbd">F6</span>
+        <span>Iniciar / Retomar</span>
+      </div>
+      <div class="hotkey-item">
+        <span class="kbd">F7</span>
+        <span>Parar Imediatamente</span>
+      </div>
+    </div>
+
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon">⚡</div>
+        <div class="feature-title">Anti-Collision</div>
+        <div class="feature-desc">Evita que duas teclas sejam disparadas no mesmo microsegundo com fila e sequenciamento inteligente.</div>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">🔄</div>
+        <div class="feature-title">Tubinhos Animados</div>
+        <div class="feature-desc">Indicador visual de cooldown: Azul recarregando, Amarelo aguardando o delay de segurança e Verde no clique.</div>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">🗗</div>
+        <div class="feature-title">Modo Mini HUD</div>
+        <div class="feature-desc">Interface compacta que pode ficar fixada em cima do jogo sem atrapalhar a sua visão de tela.</div>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">🎯</div>
+        <div class="feature-title">Background & Foreground</div>
+        <div class="feature-desc">Envie teclas diretamente para a janela do jogo em segundo plano sem perder o foco ou o mouse.</div>
+      </div>
+    </div>
+
+    <footer>
+      <p>Desenvolvido com carinho para a comunidade gamer. Código aberto no <a href="https://github.com/wellingtonpereira12/AutoKeyClicker" target="_blank">GitHub</a>.</p>
+    </footer>
+  </main>
+
+</body>
+</html>
