@@ -16,6 +16,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: deploy-vps
+  cancel-in-progress: false
+
 jobs:
   deploy:
     name: Deploy to VPS (Docker & SSL)
@@ -49,7 +53,7 @@ jobs:
             
           echo "Rebuilding and updating Docker container on VPS..."
           sshpass -p "$VPS_PASS" ssh -p "$VPS_PORT" -o StrictHostKeyChecking=no \
-            ${VPS_USER}@${VPS_HOST} "cd /root/autokeyclicker && docker compose up -d --build && nginx -t && systemctl reload nginx"
+            ${VPS_USER}@${VPS_HOST} "cd /root/autokeyclicker && docker compose down 2>/dev/null || docker rm -f autokeyclicker 2>/dev/null || true && docker compose up -d --build && nginx -t && systemctl reload nginx"
             
           echo "Deployment completed! Site live at https://autokeyclicker.pampo.tech/"
 
