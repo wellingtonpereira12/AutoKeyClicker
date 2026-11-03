@@ -430,7 +430,7 @@ class AutoKeyClickerApp:
         kh_row.pack(fill="x")
 
         tk.Label(
-            kh_row, text="Quadradinhos de Teclas:",
+            kh_row, text="Quadradinhos de Teclas (Arraste para reordenar disparo):",
             font=("Segoe UI", 9, "bold"), bg=BG_DARK, fg=FG_WHITE
         ).pack(side="left")
 
@@ -747,18 +747,32 @@ class AutoKeyClickerApp:
             bd=1,
             relief="solid",
             padx=6,
-            pady=4
+            pady=4,
+            highlightthickness=1,
+            highlightbackground=BORDER_COLOR,
+            highlightcolor=BORDER_COLOR
         )
 
-        top_row = tk.Frame(card_box, bg=BG_BOX)
+        top_row = tk.Frame(card_box, bg=BG_BOX, cursor="fleur")
         top_row.pack(fill="x", pady=(0, 2))
+
+        drag_grip = tk.Label(
+            top_row,
+            text="⠿",
+            font=("Segoe UI", 9, "bold"),
+            bg=BG_BOX,
+            fg=FG_MUTED,
+            cursor="fleur"
+        )
+        drag_grip.pack(side="left", padx=(0, 3))
 
         tag_lbl = tk.Label(
             top_row,
             text=f"Tecla #{len(self.key_cards) + 1}",
             font=("Segoe UI", 8, "bold"),
             bg=BG_BOX,
-            fg=FG_MUTED
+            fg=FG_MUTED,
+            cursor="fleur"
         )
         tag_lbl.pack(side="left")
 
@@ -815,7 +829,7 @@ class AutoKeyClickerApp:
         unit_combo.pack(side="right")
 
         # Cooldown Tube ("Tubinho") - animates as the timer elapses
-        tube_frame = tk.Frame(card_box, bg=BG_BOX, pady=3)
+        tube_frame = tk.Frame(card_box, bg=BG_BOX, pady=3, cursor="fleur")
         tube_frame.pack(fill="x")
 
         tube_canvas = tk.Canvas(
@@ -832,18 +846,135 @@ class AutoKeyClickerApp:
 
         card_data = {
             'frame': card_box,
+            'top_row': top_row,
+            'drag_grip': drag_grip,
             'tag_lbl': tag_lbl,
             'btn_del': btn_del,
             'key_combo': key_combo,
             'time_ent': time_ent,
             'unit_combo': unit_combo,
+            'tube_frame': tube_frame,
             'tube_canvas': tube_canvas,
-            'bar_id': bar_id
+            'bar_id': bar_id,
+            'card_index': len(self.key_cards)
         }
+
+        # Bind drag-and-drop to top row, drag grip, tag label, card frame and tube frame
+        for w in (card_box, top_row, drag_grip, tag_lbl, tube_frame):
+            w.bind("<ButtonPress-1>", lambda e, cd=card_data: self._on_card_drag_start(cd, e))
+            w.bind("<B1-Motion>", lambda e, cd=card_data: self._on_card_drag_motion(cd, e))
+            w.bind("<ButtonRelease-1>", lambda e, cd=card_data: self._on_card_drag_release(cd, e))
 
         btn_del.config(command=lambda cd=card_data: self.remove_key_card(cd))
         self.key_cards.append(card_data)
         self._reposition_cards()
+
+    def _apply_drag_highlight(self, card_data, is_dragging):
+        """Highlights the active dragged card visually with an accent border."""
+        try:
+            if is_dragging:
+                card_data['frame'].config(
+                    bg="#2d3139",
+                    highlightthickness=2,
+                    highlightbackground=ACCENT_BLUE,
+                    highlightcolor=ACCENT_BLUE
+                )
+                card_data['top_row'].config(bg="#2d3139")
+                card_data['drag_grip'].config(bg="#2d3139", fg=ACCENT_BLUE)
+                card_data['tag_lbl'].config(bg="#2d3139", fg=FG_WHITE)
+                if 'tube_frame' in card_data:
+                    card_data['tube_frame'].config(bg="#2d3139")
+            else:
+                card_data['frame'].config(
+                    bg=BG_BOX,
+                    highlightthickness=1,
+                    highlightbackground=BORDER_COLOR,
+                    highlightcolor=BORDER_COLOR
+                )
+                card_data['top_row'].config(bg=BG_BOX)
+                card_data['drag_grip'].config(bg=BG_BOX, fg=FG_MUTED)
+                card_data['tag_lbl'].config(bg=BG_BOX, fg=FG_MUTED)
+                if 'tube_frame' in card_data:
+                    card_data['tube_frame'].config(bg=BG_BOX)
+        except Exception:
+            pass
+
+    def _on_card_drag_start(self, card_data, event):
+        """Initiates card dragging to rearrange execution order."""
+        if self.engine.is_running:
+            return
+        self._drag_data = {
+            'card': card_data,
+            'start_x': event.x_root,
+            'start_y': event.y_root,
+            'moved': False
+        }
+        self._apply_drag_highlight(card_data, True)
+
+    def _on_card_drag_motion(self, card_data, event):
+        """Reorders cards live as the user drags across slots."""
+        if self.engine.is_running or not hasattr(self, '_drag_data') or not self._drag_data:
+            return
+        if self._drag_data.get('card') != card_data:
+            return
+
+        mx = event.x_root
+        my = event.y_root
+        if abs(mx - self._drag_data['start_x']) > 4 or abs(my - self._drag_data['start_y']) > 4:
+            self._drag_data['moved'] = True
+
+        # Auto-scroll canvas if dragging near top or bottom
+        try:
+            cy = self.cards_canvas.winfo_rooty()
+            ch = self.cards_canvas.winfo_height()
+            if my < cy + 15:
+                self.cards_canvas.yview_scroll(-1, "units")
+            elif my > cy + ch - 15:
+                self.cards_canvas.yview_scroll(1, "units")
+        except Exception:
+            pass
+
+        # Identify target card under cursor
+        src_idx = self.key_cards.index(card_data)
+        target_idx = None
+        for idx, other in enumerate(self.key_cards):
+            if other == card_data:
+                continue
+            ox1 = other['frame'].winfo_rootx()
+            oy1 = other['frame'].winfo_rooty()
+            ox2 = ox1 + other['frame'].winfo_width()
+            oy2 = oy1 + other['frame'].winfo_height()
+            if ox1 <= mx <= ox2 and oy1 <= my <= oy2:
+                target_idx = idx
+                break
+
+        # If not over a specific card, check if dragging past the end of the cards
+        if target_idx is None and len(self.key_cards) > 1:
+            try:
+                last_card = self.key_cards[-1]
+                if last_card != card_data:
+                    last_y = last_card['frame'].winfo_rooty()
+                    last_h = last_card['frame'].winfo_height()
+                    if my > last_y + last_h:
+                        target_idx = len(self.key_cards) - 1
+                    elif my >= last_y:
+                        last_x = last_card['frame'].winfo_rootx() + last_card['frame'].winfo_width()
+                        if mx > last_x:
+                            target_idx = len(self.key_cards) - 1
+            except Exception:
+                pass
+
+        if target_idx is not None and target_idx != src_idx:
+            self.key_cards.insert(target_idx, self.key_cards.pop(src_idx))
+            self._reposition_cards()
+            self._apply_drag_highlight(card_data, True)
+
+    def _on_card_drag_release(self, card_data, event):
+        """Finalizes card placement and restores normal card appearance."""
+        if hasattr(self, '_drag_data') and self._drag_data:
+            self._apply_drag_highlight(card_data, False)
+            self._drag_data = None
+            self._reposition_cards()
 
     def remove_key_card(self, card_data):
         if self.engine.is_running:
@@ -857,10 +988,11 @@ class AutoKeyClickerApp:
         self._reposition_cards()
 
     def _reposition_cards(self):
-        """Arranges cards in a clean 3-column grid."""
+        """Arranges cards in a clean 3-column grid and updates execution order labels."""
         for idx, cd in enumerate(self.key_cards):
             row = idx // 3
             col = idx % 3
+            cd['card_index'] = idx
             cd['frame'].grid(row=row, column=col, padx=3, pady=3, sticky="nsew")
             self.cards_inner_frame.grid_columnconfigure(col, weight=1)
             cd['tag_lbl'].config(text=f"Tecla #{idx + 1}")
