@@ -1,11 +1,16 @@
 {
   "Farm Ragnarok F10": {
     "name": "Farm Ragnarok F10",
-    "mode": "background",
+    "mode": "foreground",
     "jitter": true,
     "collision_delay": "3.0",
-    "hotkey": "F6",
+    "hotkey": "SPACE",
     "keys": [
+      {
+        "key": "F4",
+        "time": "18",
+        "unit": "s"
+      },
       {
         "key": "F1",
         "time": "20",
@@ -19,11 +24,6 @@
       {
         "key": "F3",
         "time": "8",
-        "unit": "s"
-      },
-      {
-        "key": "F4",
-        "time": "18",
         "unit": "s"
       }
     ]

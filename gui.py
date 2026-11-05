@@ -623,7 +623,7 @@ class AutoKeyClickerApp:
             box.grid(row=row, column=col, padx=2, pady=2, sticky="nsew")
             self.mini_hud_frame.grid_columnconfigure(col, weight=1)
 
-            # Top label row: Key on left (bold), Timer on right (muted)
+            # Top label row: Key on left (bold), Timer and Reload on right
             top_lbl = tk.Frame(box, bg=BG_BOX)
             top_lbl.pack(fill="x")
 
@@ -635,6 +635,23 @@ class AutoKeyClickerApp:
                 fg=FG_WHITE
             )
             k_lbl.pack(side="left")
+
+            btn_mini_reload = tk.Button(
+                top_lbl,
+                text="⟳",
+                font=("Segoe UI", 8, "bold"),
+                bg=BG_BOX,
+                fg=ACCENT_BLUE,
+                activebackground=ACCENT_BLUE,
+                activeforeground=FG_WHITE,
+                relief="flat",
+                bd=0,
+                padx=2,
+                pady=0,
+                cursor="hand2",
+                command=lambda c_idx=item['card_index']: self._on_reload_card_clicked_by_index(c_idx)
+            )
+            btn_mini_reload.pack(side="right", padx=(2, 0))
 
             t_lbl = tk.Label(
                 top_lbl,
@@ -792,6 +809,22 @@ class AutoKeyClickerApp:
         )
         btn_del.pack(side="right")
 
+        btn_reload = tk.Button(
+            top_row,
+            text="⟳",
+            font=("Segoe UI", 8, "bold"),
+            bg=BG_BOX,
+            fg=ACCENT_BLUE,
+            activebackground=ACCENT_BLUE,
+            activeforeground=FG_WHITE,
+            relief="flat",
+            bd=0,
+            padx=3,
+            pady=0,
+            cursor="hand2"
+        )
+        btn_reload.pack(side="right", padx=(0, 2))
+
         key_combo = ttk.Combobox(
             card_box,
             values=COMMON_KEYS,
@@ -849,6 +882,7 @@ class AutoKeyClickerApp:
             'top_row': top_row,
             'drag_grip': drag_grip,
             'tag_lbl': tag_lbl,
+            'btn_reload': btn_reload,
             'btn_del': btn_del,
             'key_combo': key_combo,
             'time_ent': time_ent,
@@ -866,6 +900,7 @@ class AutoKeyClickerApp:
             w.bind("<ButtonRelease-1>", lambda e, cd=card_data: self._on_card_drag_release(cd, e))
 
         btn_del.config(command=lambda cd=card_data: self.remove_key_card(cd))
+        btn_reload.config(command=lambda cd=card_data: self._on_reload_card_clicked(cd))
         self.key_cards.append(card_data)
         self._reposition_cards()
 
@@ -882,6 +917,10 @@ class AutoKeyClickerApp:
                 card_data['top_row'].config(bg="#2d3139")
                 card_data['drag_grip'].config(bg="#2d3139", fg=ACCENT_BLUE)
                 card_data['tag_lbl'].config(bg="#2d3139", fg=FG_WHITE)
+                if 'btn_reload' in card_data:
+                    card_data['btn_reload'].config(bg="#2d3139")
+                if 'btn_del' in card_data:
+                    card_data['btn_del'].config(bg="#2d3139")
                 if 'tube_frame' in card_data:
                     card_data['tube_frame'].config(bg="#2d3139")
             else:
@@ -894,6 +933,10 @@ class AutoKeyClickerApp:
                 card_data['top_row'].config(bg=BG_BOX)
                 card_data['drag_grip'].config(bg=BG_BOX, fg=FG_MUTED)
                 card_data['tag_lbl'].config(bg=BG_BOX, fg=FG_MUTED)
+                if 'btn_reload' in card_data:
+                    card_data['btn_reload'].config(bg=BG_BOX)
+                if 'btn_del' in card_data:
+                    card_data['btn_del'].config(bg=BG_BOX)
                 if 'tube_frame' in card_data:
                     card_data['tube_frame'].config(bg=BG_BOX)
         except Exception:
@@ -1023,6 +1066,41 @@ class AutoKeyClickerApp:
             })
         return keys_list
 
+    def _sync_engine_config(self):
+        """Synchronizes current UI key setup and mode options to the engine."""
+        keys = self._get_configured_keys()
+        mode = self.mode_var.get()
+        jitter = self.jitter_var.get()
+        try:
+            col_delay = float(self.collision_delay_var.get().replace(',', '.'))
+        except (ValueError, AttributeError):
+            col_delay = 3.0
+
+        target_hwnd = self.selected_window['hwnd'] if self.selected_window else None
+        target_title = self.selected_window['title'] if self.selected_window else ""
+
+        self.engine.set_config(
+            target_hwnd=target_hwnd,
+            target_title=target_title,
+            keys_list=keys,
+            mode=mode,
+            jitter_enabled=jitter,
+            collision_pause=col_delay
+        )
+
+    def _on_reload_card_clicked(self, card_data):
+        """Triggers immediate reload & execution when clicking the reload button in expanded mode."""
+        if card_data in self.key_cards:
+            c_idx = self.key_cards.index(card_data)
+        else:
+            c_idx = card_data.get('card_index', 0)
+        self._on_reload_card_clicked_by_index(c_idx)
+
+    def _on_reload_card_clicked_by_index(self, card_index):
+        """Triggers immediate reload & execution for a given card index."""
+        self._sync_engine_config()
+        self.engine.trigger_card_reload(card_index)
+
     def _animate_tubinhos(self):
         """Smoothly animates the cooldown tubes underneath each key card at ~30 FPS."""
         try:
@@ -1041,7 +1119,7 @@ class AutoKeyClickerApp:
                     if not tube_canvas or not bar_id:
                         continue
 
-                    if is_running and card_idx in progress_data:
+                    if card_idx in progress_data:
                         info = progress_data[card_idx]
                         p = info.get('progress', 0.0)
                         is_waiting = info.get('waiting_collision', False)
@@ -1280,6 +1358,9 @@ class AutoKeyClickerApp:
                 self.title_lbl.config(text=f"⚡ AutoClicker [{self.selected_window['exe']}]")
 
     def start_clicker(self):
+        if self.engine.is_running:
+            return
+
         if not self.selected_window or not is_window_alive(self.selected_window['hwnd']):
             self.refresh_windows_list()
             if not self.selected_window:
@@ -1297,21 +1378,7 @@ class AutoKeyClickerApp:
             )
             return
 
-        mode = self.mode_var.get()
-        jitter = self.jitter_var.get()
-        try:
-            col_delay = float(self.collision_delay_var.get().replace(',', '.'))
-        except (ValueError, AttributeError):
-            col_delay = 3.0
-
-        self.engine.set_config(
-            target_hwnd=self.selected_window['hwnd'],
-            target_title=self.selected_window['title'],
-            keys_list=keys,
-            mode=mode,
-            jitter_enabled=jitter,
-            collision_pause=col_delay
-        )
+        self._sync_engine_config()
         self.engine.start()
 
     def stop_clicker(self):

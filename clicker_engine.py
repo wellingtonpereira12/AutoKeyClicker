@@ -32,6 +32,7 @@ class ClickerEngine:
         
         # State tracking for each key card
         self._key_cycles = {}  # {card_index: {'start_time': float, 'duration': float, 'waiting_collision': bool, 'last_click_time': float}}
+        self._reload_events = {}  # {card_index: threading.Event()}
         
         # Anti-collision state: prevents two different keys from pressing simultaneously
         self._last_click_time = 0.0
@@ -122,6 +123,7 @@ class ClickerEngine:
         if self.on_state_change:
             self.on_state_change(True, f"Executando {len(active_keys)} teclas: {keys_summary}")
 
+        self._reload_events = {k.get('card_index', index): threading.Event() for index, k in enumerate(active_keys)}
         self._threads = []
         for index, key_cfg in enumerate(active_keys):
             t = threading.Thread(
@@ -132,6 +134,53 @@ class ClickerEngine:
             )
             t.start()
             self._threads.append(t)
+
+    def trigger_card_reload(self, card_index):
+        """Forces immediate reload & execution for a specific key card."""
+        if self.is_running:
+            ev = self._reload_events.get(card_index)
+            if ev:
+                ev.set()
+        else:
+            threading.Thread(
+                target=self._manual_card_trigger,
+                args=(card_index,),
+                daemon=True,
+                name=f"ManualReload-{card_index}"
+            ).start()
+
+    def _manual_card_trigger(self, card_index):
+        """Handles manual reload click when clicker is not actively running."""
+        if not self.target_hwnd or not is_window_alive(self.target_hwnd):
+            if self.on_state_change:
+                self.on_state_change(False, "Erro: Selecione uma janela/jogo antes de recarregar!")
+            return
+
+        key_cfg = next((k for k in self.keys_list if k.get('card_index') == card_index), None)
+        if not key_cfg:
+            if 0 <= card_index < len(self.keys_list):
+                key_cfg = self.keys_list[card_index]
+            else:
+                return
+
+        key_str = key_cfg.get('key')
+        if not key_str:
+            return
+
+        base_interval_ms = max(1, int(key_cfg.get('interval_ms', 1000)))
+        delay_sec = max(0.005, base_interval_ms / 1000.0)
+
+        # Mark yellow as it enters collision wait/queue
+        now = time.time()
+        with self._cycle_lock:
+            self._key_cycles[card_index] = {
+                'start_time': now,
+                'duration': 0.001,
+                'waiting_collision': True,
+                'last_click_time': self._last_click_time
+            }
+
+        self._execute_click_with_collision(key_str, card_index, delay_sec, force=True)
 
     def stop(self, reason="Parado pelo usuário"):
         if not self.is_running:
@@ -151,12 +200,11 @@ class ClickerEngine:
           - Yellow: waiting for anti-collision delay (progress 1.0, waiting_collision=True)
           - Green flash: 200ms right after a click (via last_click_time)
         """
-        if not self.is_running:
-            return {}
-
         now = time.time()
         result = {}
         with self._cycle_lock:
+            if not self._key_cycles:
+                return {}
             for card_idx, info in self._key_cycles.items():
                 dur = info.get('duration', 1.0)
                 elapsed = now - info.get('start_time', now)
@@ -174,7 +222,7 @@ class ClickerEngine:
                 }
         return result
 
-    def _execute_click_with_collision(self, key_str, card_index, base_delay_sec):
+    def _execute_click_with_collision(self, key_str, card_index, base_delay_sec, force=False):
         """
         Executes a click strictly enforcing the anti-collision rule:
         If two or more keys would trigger together, a pause is enforced.
@@ -182,11 +230,11 @@ class ClickerEngine:
         During the anti-collision wait, waiting_collision=True (tubinho AMARELO).
         Immediately after the click, waiting_collision=False and start_time resets to now (tubinho AZUL).
         """
-        if not self.is_running or self._stop_event.is_set():
+        if not force and (not self.is_running or self._stop_event.is_set()):
             return False
 
         with self._collision_lock:
-            if not self.is_running or self._stop_event.is_set():
+            if not force and (not self.is_running or self._stop_event.is_set()):
                 return False
 
             now = time.time()
@@ -203,15 +251,16 @@ class ClickerEngine:
 
                     # Sleep in small slices so stopping is instantaneous
                     wake_time = now + wait_needed
-                    while time.time() < wake_time and self.is_running and not self._stop_event.is_set():
+                    while time.time() < wake_time and (force or (self.is_running and not self._stop_event.is_set())):
                         time.sleep(0.015)
 
-                    if not self.is_running or self._stop_event.is_set():
+                    if not force and (not self.is_running or self._stop_event.is_set()):
                         return False
 
             # Check if target window is still alive
             if not is_window_alive(self.target_hwnd):
-                self.stop("A janela do jogo foi fechada!")
+                if not force:
+                    self.stop("A janela do jogo foi fechada!")
                 return False
 
             # Perform the physical keystroke
@@ -240,7 +289,7 @@ class ClickerEngine:
                 current_clicks = self.clicks_count
 
             if self.on_tick:
-                elapsed = time.time() - self.start_time
+                elapsed = time.time() - self.start_time if self.start_time > 0 else 0
                 self.on_tick(current_clicks, elapsed)
 
             return True
@@ -250,6 +299,7 @@ class ClickerEngine:
         key_str = key_cfg['key']
         base_interval_ms = max(1, int(key_cfg['interval_ms']))
         delay_sec = max(0.005, base_interval_ms / 1000.0)
+        reload_ev = self._reload_events.get(card_index)
 
         # 1. INITIAL SEQUENCED CAST ON START:
         # All keys start available in YELLOW.
@@ -257,6 +307,9 @@ class ClickerEngine:
         # with anti-collision pause enforced between them.
         time.sleep(0.08)  # brief 80ms beat so user sees all yellow tubes on start
         while self.is_running and not self._stop_event.is_set() and self._startup_turn < index:
+            if reload_ev and reload_ev.is_set():
+                reload_ev.clear()
+                break
             time.sleep(0.015)
 
         if not self.is_running or self._stop_event.is_set():
@@ -289,6 +342,9 @@ class ClickerEngine:
             # Wait while the tube charges in vibrant blue
             cycle_end = cycle_start + cycle_duration
             while time.time() < cycle_end and self.is_running and not self._stop_event.is_set():
+                if reload_ev and reload_ev.is_set():
+                    reload_ev.clear()
+                    break
                 time.sleep(0.015)
 
             if not self.is_running or self._stop_event.is_set():
