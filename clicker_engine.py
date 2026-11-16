@@ -29,6 +29,9 @@ class ClickerEngine:
         self._input_lock = threading.Lock()
         self._cycle_lock = threading.Lock()
         self._collision_lock = threading.Lock()
+        self._collision_cond = threading.Condition(self._collision_lock)
+        self._pending_keys = set()
+        self._card_priority = {}
         
         # State tracking for each key card
         self._key_cycles = {}  # {card_index: {'start_time': float, 'duration': float, 'waiting_collision': bool, 'last_click_time': float}}
@@ -69,6 +72,7 @@ class ClickerEngine:
         self.jitter_enabled = jitter_enabled
         self.collision_pause_sec = max(0.1, float(collision_pause))
         self.hotkey_target_only = bool(hotkey_target_only)
+        self._card_priority = {k.get('card_index', idx): idx for idx, k in enumerate(keys_list)}
 
     def set_hotkey_toggle(self, vk):
         self.hotkey_toggle_vk = vk
@@ -105,6 +109,12 @@ class ClickerEngine:
         self._last_key_clicked = None
         self._startup_turn = 0
 
+        # Map each active card to its sequence priority based strictly on UI card order
+        self._card_priority = {
+            k.get('card_index', index): index 
+            for index, k in enumerate(active_keys)
+        }
+
         # On start: ALL keys start available in full YELLOW (waiting to be executed in sequence)
         with self._cycle_lock:
             self._key_cycles.clear()
@@ -117,6 +127,10 @@ class ClickerEngine:
                     'waiting_collision': True,  # Starts YELLOW
                     'last_click_time': 0.0
                 }
+
+        # Pre-populate pending keys so card priority is strictly enforced from the first click
+        with self._collision_cond:
+            self._pending_keys = set(self._card_priority.keys())
 
         keys_summary = ", ".join([f"{k['key']} ({k['interval_ms']}ms)" for k in active_keys[:3]])
         if len(active_keys) > 3:
@@ -191,6 +205,9 @@ class ClickerEngine:
         self._stop_event.set()
         with self._cycle_lock:
             self._key_cycles.clear()
+        with self._collision_cond:
+            self._pending_keys.clear()
+            self._collision_cond.notify_all()
         if self.on_state_change:
             self.on_state_change(False, reason)
 
@@ -226,43 +243,62 @@ class ClickerEngine:
 
     def _execute_click_with_collision(self, key_str, card_index, base_delay_sec, force=False):
         """
-        Executes a click strictly enforcing the anti-collision rule:
-        If two or more keys would trigger together, a pause is enforced.
-        'Primeiro clica esse, depois clica esse. Você não pode clicar os dois juntos.'
-        During the anti-collision wait, waiting_collision=True (tubinho AMARELO).
-        Immediately after the click, waiting_collision=False and start_time resets to now (tubinho AZUL).
+        Executes a click strictly enforcing priority by card sequence and anti-collision rule:
+        If two or more keys would trigger together or are paused in the anti-collision window,
+        the one highest in the cards list (lowest card priority) ALWAYS executes first.
         """
         if not force and (not self.is_running or self._stop_event.is_set()):
             return False
 
-        with self._collision_lock:
-            if not force and (not self.is_running or self._stop_event.is_set()):
-                return False
+        # Mark yellow (waiting collision/queue)
+        with self._cycle_lock:
+            if card_index in self._key_cycles:
+                self._key_cycles[card_index]['waiting_collision'] = True
+                self._key_cycles[card_index]['duration'] = 0.001
 
-            now = time.time()
-
-            # Anti-collision check: if another key was clicked less than collision_pause_sec ago
-            if self._last_key_clicked is not None and self._last_key_clicked != key_str:
-                time_since_last = now - self._last_click_time
-                wait_needed = self.collision_pause_sec - time_since_last
-                if wait_needed > 0.01:
-                    # Key is waiting for collision delay: turn tubinho AMARELO
-                    with self._cycle_lock:
-                        if card_index in self._key_cycles:
-                            self._key_cycles[card_index]['waiting_collision'] = True
-
-                    # Sleep in small slices so stopping is instantaneous
-                    wake_time = now + wait_needed
-                    while time.time() < wake_time and (force or (self.is_running and not self._stop_event.is_set())):
-                        time.sleep(0.015)
-
+        with self._collision_cond:
+            self._pending_keys.add(card_index)
+            try:
+                while True:
                     if not force and (not self.is_running or self._stop_event.is_set()):
+                        self._pending_keys.discard(card_index)
+                        self._collision_cond.notify_all()
                         return False
+
+                    # Determine who among all currently waiting keys has the highest priority
+                    # (lowest priority number = earlier card in the UI sequence)
+                    best_card = min(self._pending_keys, key=lambda c: self._card_priority.get(c, c))
+
+                    if card_index != best_card:
+                        # Another waiting card has higher priority in the card list.
+                        # We must wait for it to execute first!
+                        self._collision_cond.wait(timeout=0.03)
+                        continue
+
+                    # We are the highest-priority card among all pending keys!
+                    # Check if the anti-collision pause time has elapsed since the last click.
+                    now = time.time()
+                    if self._last_key_clicked is not None and self._last_key_clicked != key_str:
+                        time_since_last = now - self._last_click_time
+                        wait_needed = self.collision_pause_sec - time_since_last
+                        if wait_needed > 0.005:
+                            # Wait up to wait_needed (in short slices to allow stops or new higher priority arrivals)
+                            self._collision_cond.wait(timeout=min(wait_needed, 0.03))
+                            continue
+
+                    # We won the execution turn! Remove ourselves from pending keys
+                    self._pending_keys.discard(card_index)
+                    break
+            except Exception:
+                self._pending_keys.discard(card_index)
+                self._collision_cond.notify_all()
+                raise
 
             # Check if target window is still alive
             if not is_window_alive(self.target_hwnd):
                 if not force:
                     self.stop("A janela do jogo foi fechada!")
+                self._collision_cond.notify_all()
                 return False
 
             # Perform the physical keystroke
@@ -294,6 +330,8 @@ class ClickerEngine:
                 elapsed = time.time() - self.start_time if self.start_time > 0 else 0
                 self.on_tick(current_clicks, elapsed)
 
+            # Wake up next waiting keys in line
+            self._collision_cond.notify_all()
             return True
 
     def _run_single_key_loop(self, key_cfg, index):
@@ -305,23 +343,13 @@ class ClickerEngine:
 
         # 1. INITIAL SEQUENCED CAST ON START:
         # All keys start available in YELLOW.
-        # They execute in strict index order (Tecla #1 first, then Tecla #2, etc.),
-        # with anti-collision pause enforced between them.
-        time.sleep(0.08)  # brief 80ms beat so user sees all yellow tubes on start
-        while self.is_running and not self._stop_event.is_set() and self._startup_turn < index:
-            if reload_ev and reload_ev.is_set():
-                reload_ev.clear()
-                break
-            time.sleep(0.015)
-
+        # They execute in strict priority card order, with anti-collision pause enforced between them.
+        time.sleep(0.05)
         if not self.is_running or self._stop_event.is_set():
             return
 
         if not self._execute_click_with_collision(key_str, card_index, delay_sec):
             return
-
-        # Advance startup turn so the next key in line can execute
-        self._startup_turn = index + 1
 
         # 2. SUBSEQUENT CYCLES:
         # Reload (Tubinho Azul charging 0% -> 100%) -> Click (Tubinho flash verde / yellow if collision)
@@ -358,7 +386,7 @@ class ClickerEngine:
                     self._key_cycles[card_index]['waiting_collision'] = True
                     self._key_cycles[card_index]['duration'] = 0.001
 
-            # Fire keystroke (wait in yellow ONLY if waiting collision pause)
+            # Fire keystroke (wait in yellow in priority order)
             if not self._execute_click_with_collision(key_str, card_index, delay_sec):
                 break
 
