@@ -26,7 +26,8 @@
         "time": "8",
         "unit": "s"
       }
-    ]
+    ],
+    "hotkey_target_only": true
   },
   "Auto Pot & Buffs": {
     "name": "Auto Pot & Buffs",
@@ -50,7 +51,8 @@
         "time": "3000",
         "unit": "ms"
       }
-    ]
+    ],
+    "hotkey_target_only": true
   },
   "TESTE": {
     "name": "TESTE",
@@ -74,7 +76,8 @@
         "time": "7",
         "unit": "s"
       }
-    ]
+    ],
+    "hotkey_target_only": true
   },
   "d": {
     "name": "d",
@@ -98,6 +101,7 @@
         "time": "7",
         "unit": "s"
       }
-    ]
+    ],
+    "hotkey_target_only": true
   }
 }

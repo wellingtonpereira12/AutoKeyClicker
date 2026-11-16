@@ -144,6 +144,35 @@ def list_user_windows():
 def is_window_alive(hwnd):
     return bool(user32.IsWindow(hwnd))
 
+def is_target_window_active(target_hwnd):
+    """
+    Returns True if target_hwnd (or a child/popup belonging to the same process)
+    is currently the active foreground window.
+    """
+    if not target_hwnd or not is_window_alive(target_hwnd):
+        return False
+    try:
+        ensure_interactive_desktop()
+        fg_hwnd = user32.GetForegroundWindow()
+        if not fg_hwnd:
+            return False
+        if fg_hwnd == target_hwnd:
+            return True
+        # Check parent / root ancestor
+        # GA_ROOT = 2, GA_ROOTOWNER = 3
+        if user32.GetAncestor(fg_hwnd, 2) == target_hwnd or user32.GetAncestor(fg_hwnd, 3) == target_hwnd:
+            return True
+        # Compare Process ID: handles multi-window games, sub-viewports, launcher-wrapped windows
+        target_pid = wintypes.DWORD()
+        fg_pid = wintypes.DWORD()
+        user32.GetWindowThreadProcessId(target_hwnd, ctypes.byref(target_pid))
+        user32.GetWindowThreadProcessId(fg_hwnd, ctypes.byref(fg_pid))
+        if target_pid.value and target_pid.value == fg_pid.value:
+            return True
+    except Exception:
+        pass
+    return False
+
 def activate_window(hwnd):
     """Brings window to front and restores it if minimized."""
     if not is_window_alive(hwnd):

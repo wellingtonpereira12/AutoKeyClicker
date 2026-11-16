@@ -10,7 +10,7 @@ import time
 import random
 import ctypes
 from key_sender import send_key_background, send_key_foreground, resolve_key
-from window_manager import is_window_alive, activate_window
+from window_manager import is_window_alive, activate_window, is_target_window_active
 
 user32 = ctypes.windll.user32
 
@@ -50,6 +50,7 @@ class ClickerEngine:
         self.hotkey_toggle_vk = 0x75  # F6 (single key for toggle start/stop)
         self.hotkey_start_vk = 0x75  # F6 (fallback)
         self.hotkey_stop_vk = None   # None (unified single toggle key)
+        self.hotkey_target_only = True  # Only fire hotkey if target game is in foreground
 
         # Stats
         self.clicks_count = 0
@@ -60,13 +61,14 @@ class ClickerEngine:
         self._hotkey_thread = threading.Thread(target=self._hotkey_loop, daemon=True)
         self._hotkey_thread.start()
 
-    def set_config(self, target_hwnd, target_title, keys_list, mode="background", jitter_enabled=True, collision_pause=3.0):
+    def set_config(self, target_hwnd, target_title, keys_list, mode="background", jitter_enabled=True, collision_pause=3.0, hotkey_target_only=True):
         self.target_hwnd = target_hwnd
         self.target_title = target_title
         self.keys_list = keys_list
         self.mode = mode
         self.jitter_enabled = jitter_enabled
         self.collision_pause_sec = max(0.1, float(collision_pause))
+        self.hotkey_target_only = bool(hotkey_target_only)
 
     def set_hotkey_toggle(self, vk):
         self.hotkey_toggle_vk = vk
@@ -371,6 +373,13 @@ class ClickerEngine:
                 if self.hotkey_toggle_vk:
                     toggle_state = bool(user32.GetAsyncKeyState(self.hotkey_toggle_vk) & 0x8000)
                     if toggle_state and not was_toggle_pressed:
+                        # Restrict to target window if enabled
+                        if self.hotkey_target_only:
+                            if not self.target_hwnd or not is_target_window_active(self.target_hwnd):
+                                was_toggle_pressed = toggle_state
+                                time.sleep(0.03)
+                                continue
+
                         # Rising edge
                         if self.on_hotkey_toggle:
                             self.on_hotkey_toggle()
@@ -385,6 +394,12 @@ class ClickerEngine:
                 if self.hotkey_stop_vk and self.hotkey_stop_vk != self.hotkey_toggle_vk:
                     stop_state = bool(user32.GetAsyncKeyState(self.hotkey_stop_vk) & 0x8000)
                     if stop_state and not was_stop_pressed:
+                        if self.hotkey_target_only:
+                            if not self.target_hwnd or not is_target_window_active(self.target_hwnd):
+                                was_stop_pressed = stop_state
+                                time.sleep(0.03)
+                                continue
+
                         if self.on_hotkey_stop:
                             self.on_hotkey_stop()
                         else:

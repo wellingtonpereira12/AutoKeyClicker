@@ -558,6 +558,25 @@ class AutoKeyClickerApp:
         )
         lbl_hk.pack(anchor="w", pady=(1, 4))
 
+        # Opção de isolar o atalho para acionar somente dentro do jogo
+        self.hotkey_target_only_var = tk.BooleanVar(value=True)
+        cb_hk_target = tk.Checkbutton(
+            p_card,
+            text="🎯 Disparar atalho apenas quando o jogo/janela estiver em foco",
+            variable=self.hotkey_target_only_var,
+            bg=BG_CARD, fg=FG_WHITE, selectcolor=BG_INPUT,
+            activebackground=BG_CARD, activeforeground=FG_WHITE, font=("Segoe UI", 8, "bold"),
+            command=self._on_hotkey_target_only_changed
+        )
+        cb_hk_target.pack(anchor="w", pady=(3, 1))
+
+        lbl_hk_target = tk.Label(
+            p_card,
+            text="Evita acionar o clicker ao digitar ESPAÇO ou teclas no navegador e outras abas.",
+            font=("Segoe UI", 7, "italic"), bg=BG_CARD, fg=FG_MUTED
+        )
+        lbl_hk_target.pack(anchor="w", pady=(0, 4))
+
     def _create_card(self, parent, title):
         card = tk.LabelFrame(
             parent,
@@ -1078,6 +1097,7 @@ class AutoKeyClickerApp:
 
         target_hwnd = self.selected_window['hwnd'] if self.selected_window else None
         target_title = self.selected_window['title'] if self.selected_window else ""
+        target_only = self.hotkey_target_only_var.get() if hasattr(self, 'hotkey_target_only_var') else True
 
         self.engine.set_config(
             target_hwnd=target_hwnd,
@@ -1085,8 +1105,12 @@ class AutoKeyClickerApp:
             keys_list=keys,
             mode=mode,
             jitter_enabled=jitter,
-            collision_pause=col_delay
+            collision_pause=col_delay,
+            hotkey_target_only=target_only
         )
+
+    def _on_hotkey_target_only_changed(self):
+        self._sync_engine_config()
 
     def _on_reload_card_clicked(self, card_data):
         """Triggers immediate reload & execution when clicking the reload button in expanded mode."""
@@ -1261,6 +1285,7 @@ class AutoKeyClickerApp:
             "jitter": self.jitter_var.get(),
             "collision_delay": self.collision_delay_var.get() if hasattr(self, 'collision_delay_var') else "3.0",
             "hotkey": self.hotkey_var.get() if hasattr(self, 'hotkey_var') else "F6",
+            "hotkey_target_only": self.hotkey_target_only_var.get() if hasattr(self, 'hotkey_target_only_var') else True,
             "keys": keys_data
         }
 
@@ -1283,6 +1308,9 @@ class AutoKeyClickerApp:
         if hasattr(self, 'hotkey_var'):
             self.hotkey_var.set(setup_data.get('hotkey', 'F6'))
             self._on_hotkey_changed(None)
+        if hasattr(self, 'hotkey_target_only_var'):
+            self.hotkey_target_only_var.set(setup_data.get('hotkey_target_only', True))
+            self._on_hotkey_target_only_changed()
 
         for cd in list(self.key_cards):
             cd['frame'].destroy()
@@ -1356,6 +1384,7 @@ class AutoKeyClickerApp:
             self.selected_window = self.windows_cache[idx]
             if self.is_mini_mode:
                 self.title_lbl.config(text=f"⚡ AutoClicker [{self.selected_window['exe']}]")
+            self._sync_engine_config()
 
     def start_clicker(self):
         if self.engine.is_running:
