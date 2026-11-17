@@ -33,6 +33,7 @@ class ClickerEngine:
         self._collision_cond = threading.Condition(self._collision_lock)
         self._pending_keys = set()
         self._card_priority = {}
+        self._active_card = None
         
         # State tracking for each key card
         self._key_cycles = {}  # {card_index: {'start_time': float, 'duration': float, 'waiting_collision': bool, 'last_click_time': float}}
@@ -47,6 +48,7 @@ class ClickerEngine:
         # Configuration
         self.target_hwnd = None
         self.target_title = ""
+        self.target_exe = ""
         self.keys_list = []  # list of dicts: [{'key': 'F1', 'interval_ms': 19000, 'enabled': True}, ...]
         self.jitter_enabled = True
         self.jitter_range = 25  # +/- 25ms random jitter
@@ -65,9 +67,10 @@ class ClickerEngine:
         self._hotkey_thread = threading.Thread(target=self._hotkey_loop, daemon=True)
         self._hotkey_thread.start()
 
-    def set_config(self, target_hwnd, target_title, keys_list, mode="background", jitter_enabled=True, collision_pause=3.0, hotkey_target_only=True):
+    def set_config(self, target_hwnd, target_title, keys_list, mode="background", jitter_enabled=True, collision_pause=3.0, hotkey_target_only=True, target_exe=""):
         self.target_hwnd = target_hwnd
         self.target_title = target_title
+        self.target_exe = target_exe
         self.keys_list = keys_list
         self.mode = mode
         self.jitter_enabled = jitter_enabled
@@ -118,9 +121,10 @@ class ClickerEngine:
             for index, k in enumerate(active_keys)
         }
 
-        # Clear any stale pending keys from previous runs
+        # Pre-populate pending keys on start so priority order is strictly enforced from the first click
         with self._collision_cond:
-            self._pending_keys.clear()
+            self._active_card = None
+            self._pending_keys = set(self._card_priority.keys())
 
         # On start: ALL keys start available in full YELLOW (waiting to be executed in sequence)
         with self._cycle_lock:
@@ -211,6 +215,7 @@ class ClickerEngine:
             self._key_cycles.clear()
         with self._collision_cond:
             self._pending_keys.clear()
+            self._active_card = None
             self._collision_cond.notify_all()
         if self.on_state_change:
             self.on_state_change(False, reason)
@@ -265,51 +270,88 @@ class ClickerEngine:
         # 1. Coordinate priority queue and anti-collision pause
         with self._collision_cond:
             self._pending_keys.add(card_index)
-            try:
-                while True:
-                    if not force and (not self.is_running or self._stop_event.is_set()):
-                        return False
-                    if run_id is not None and run_id != self._run_id:
-                        return False
+            while True:
+                if not force and (not self.is_running or self._stop_event.is_set()):
+                    self._pending_keys.discard(card_index)
+                    if self._active_card == card_index:
+                        self._active_card = None
+                    self._collision_cond.notify_all()
+                    return False
+                if run_id is not None and run_id != self._run_id:
+                    self._pending_keys.discard(card_index)
+                    if self._active_card == card_index:
+                        self._active_card = None
+                    self._collision_cond.notify_all()
+                    return False
 
-                    if not self._pending_keys:
-                        return False
+                if not self._pending_keys:
+                    return False
 
-                    # Determine who among all currently waiting keys has the highest priority
-                    best_card = min(self._pending_keys, key=lambda c: self._card_priority.get(c, c))
+                # If another card is currently sending its key, wait
+                if self._active_card is not None and self._active_card != card_index:
+                    self._collision_cond.wait(timeout=0.03)
+                    continue
 
-                    if card_index != best_card:
-                        # Another waiting card has higher priority in the card list.
-                        # Wait for it to execute!
-                        self._collision_cond.wait(timeout=0.03)
+                # Determine who among all currently waiting keys has the highest priority
+                best_card = min(self._pending_keys, key=lambda c: self._card_priority.get(c, c))
+
+                if card_index != best_card:
+                    # Another waiting card has higher priority in the card list. Wait for it!
+                    self._collision_cond.wait(timeout=0.03)
+                    continue
+
+                # We are highest priority! Check anti-collision pause
+                now = time.time()
+                if self._last_key_clicked is not None and self._last_key_clicked != key_str:
+                    time_since_last = now - self._last_click_time
+                    wait_needed = self.collision_pause_sec - time_since_last
+                    if wait_needed > 0.005:
+                        # Wait in short slices
+                        self._collision_cond.wait(timeout=min(wait_needed, 0.03))
                         continue
 
-                    # We are highest priority! Check anti-collision pause
-                    now = time.time()
-                    if self._last_key_clicked is not None and self._last_key_clicked != key_str:
-                        time_since_last = now - self._last_click_time
-                        wait_needed = self.collision_pause_sec - time_since_last
-                        if wait_needed > 0.005:
-                            # Wait in short slices
-                            self._collision_cond.wait(timeout=min(wait_needed, 0.03))
-                            continue
-
-                    # Turn won!
-                    break
-            finally:
-                self._pending_keys.discard(card_index)
-                self._collision_cond.notify_all()
+                # Claim active execution turn
+                self._active_card = card_index
+                break
 
         if not force and (not self.is_running or self._stop_event.is_set()):
+            with self._collision_cond:
+                self._pending_keys.discard(card_index)
+                if self._active_card == card_index:
+                    self._active_card = None
+                self._collision_cond.notify_all()
             return False
         if run_id is not None and run_id != self._run_id:
+            with self._collision_cond:
+                self._pending_keys.discard(card_index)
+                if self._active_card == card_index:
+                    self._active_card = None
+                self._collision_cond.notify_all()
             return False
 
-        # 2. OUTSIDE THE COLLISION LOCK: Check target window status
+        # 2. Check target window status (auto-recover if game restarted with new HWND)
         if not is_window_alive(self.target_hwnd):
-            if not force:
-                self.stop("A janela do jogo foi fechada!")
-            return False
+            new_hwnd = None
+            try:
+                from window_manager import list_user_windows
+                for w in list_user_windows():
+                    if (self.target_exe and self.target_exe.lower() == w['exe'].lower()) or \
+                       (self.target_title and self.target_title.lower() in w['title'].lower()):
+                        new_hwnd = w['hwnd']
+                        break
+            except Exception:
+                pass
+            if new_hwnd and is_window_alive(new_hwnd):
+                self.target_hwnd = new_hwnd
+            else:
+                if not force:
+                    self.stop("A janela do jogo foi fechada!")
+                with self._collision_cond:
+                    self._pending_keys.discard(card_index)
+                    if self._active_card == card_index:
+                        self._active_card = None
+                    self._collision_cond.notify_all()
+                return False
 
         # 3. Perform physical keystroke
         if self.mode == "background":
@@ -320,11 +362,14 @@ class ClickerEngine:
                 time.sleep(0.015)
                 send_key_foreground(key_str)
 
-        # 4. Update last click time and notify next waiting key
+        # 4. Update last click time and notify next waiting key in line
         click_time = time.time()
         with self._collision_cond:
             self._last_click_time = click_time
             self._last_key_clicked = key_str
+            self._pending_keys.discard(card_index)
+            if self._active_card == card_index:
+                self._active_card = None
             self._collision_cond.notify_all()
 
         # 5. Update key cycle: mark click time and reset to reloading (AZUL)
@@ -419,7 +464,24 @@ class ClickerEngine:
                             last_toggle_time = now
                             # Restrict to target window if enabled
                             if self.hotkey_target_only:
-                                if not self.target_hwnd or not is_target_window_active(self.target_hwnd):
+                                active = False
+                                if self.target_hwnd and is_target_window_active(self.target_hwnd):
+                                    active = True
+                                elif self.target_exe or self.target_title:
+                                    try:
+                                        fg = user32.GetForegroundWindow()
+                                        if fg:
+                                            pid = wintypes.DWORD()
+                                            user32.GetWindowThreadProcessId(fg, ctypes.byref(pid))
+                                            from window_manager import get_process_name
+                                            exe_fg = get_process_name(pid.value)
+                                            if (self.target_exe and self.target_exe.lower() == exe_fg.lower()) or \
+                                               (self.target_title and self.target_title.lower() in exe_fg.lower()):
+                                                self.target_hwnd = fg
+                                                active = True
+                                    except Exception:
+                                        pass
+                                if not active:
                                     was_toggle_pressed = toggle_state
                                     time.sleep(0.03)
                                     continue

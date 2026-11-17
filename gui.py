@@ -134,6 +134,7 @@ class AutoKeyClickerApp:
         self._build_ui()
         self.load_setups_from_disk()
         self.refresh_windows_list()
+        self._sync_engine_config()
 
         # Start cooldown animated tubes loop
         self._animate_tubinhos()
@@ -1099,6 +1100,7 @@ class AutoKeyClickerApp:
 
         target_hwnd = self.selected_window['hwnd'] if self.selected_window else None
         target_title = self.selected_window['title'] if self.selected_window else ""
+        target_exe = self.selected_window['exe'] if self.selected_window else getattr(self, '_saved_target_exe', '')
         target_only = self.hotkey_target_only_var.get() if hasattr(self, 'hotkey_target_only_var') else True
 
         self.engine.set_config(
@@ -1108,7 +1110,8 @@ class AutoKeyClickerApp:
             mode=mode,
             jitter_enabled=jitter,
             collision_pause=col_delay,
-            hotkey_target_only=target_only
+            hotkey_target_only=target_only,
+            target_exe=target_exe
         )
 
     def _on_hotkey_target_only_changed(self):
@@ -1383,6 +1386,8 @@ class AutoKeyClickerApp:
                 )
         else:
             self.add_key_card("F10", "5", "s")
+
+        self._sync_engine_config()
 
     def delete_selected_setup(self):
         name = self.saved_setups_combo.get().strip()

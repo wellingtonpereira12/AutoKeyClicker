@@ -199,7 +199,7 @@ def send_key_foreground(key_str, hold_ms=35):
     # Down input
     inp_down = INPUT()
     inp_down.type = INPUT_KEYBOARD
-    inp_down.u.ki.wVk = 0  # 0 when using KEYEVENTF_SCANCODE for DirectX compatibility
+    inp_down.u.ki.wVk = vk
     inp_down.u.ki.wScan = scancode
     inp_down.u.ki.dwFlags = KEYEVENTF_SCANCODE
     inp_down.u.ki.time = 0
@@ -211,11 +211,12 @@ def send_key_foreground(key_str, hold_ms=35):
     # Up input
     inp_up = INPUT()
     inp_up.type = INPUT_KEYBOARD
-    inp_up.u.ki.wVk = 0
+    inp_up.u.ki.wVk = vk
     inp_up.u.ki.wScan = scancode
     inp_up.u.ki.dwFlags = KEYEVENTF_SCANCODE | KEYEVENTF_KEYUP
     inp_up.u.ki.time = 0
     inp_up.u.ki.dwExtraInfo = 0
 
     user32.SendInput(1, ctypes.byref(inp_up), ctypes.sizeof(INPUT))
+    return True
     return True

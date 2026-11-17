@@ -1,7 +1,9 @@
 {
   "Farm Ragnarok F10": {
     "name": "Farm Ragnarok F10",
-    "mode": "foreground",
+    "target_exe": "RF_Online_4gb.bin",
+    "target_title": "RF Online",
+    "mode": "background",
     "jitter": true,
     "collision_delay": "3.0",
     "hotkey": "SPACE",

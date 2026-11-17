@@ -201,11 +201,19 @@ def is_target_window_active(target_hwnd):
         pass
     return False
 
+user32.IsIconic.restype = wintypes.BOOL
+user32.IsIconic.argtypes = [wintypes.HWND]
+
 def activate_window(hwnd):
-    """Brings window to front and restores it if minimized."""
+    """Brings window to front without disturbing active Direct3D rendering."""
     if not is_window_alive(hwnd):
         return False
-    # SW_RESTORE = 9
-    user32.ShowWindow(hwnd, 9)
-    user32.SetForegroundWindow(hwnd)
+    try:
+        # Only restore if actually minimized (iconic) to avoid Direct3D crashes
+        if user32.IsIconic(hwnd):
+            user32.ShowWindow(hwnd, 9)  # SW_RESTORE
+        if user32.GetForegroundWindow() != hwnd:
+            user32.SetForegroundWindow(hwnd)
+    except Exception:
+        pass
     return True
