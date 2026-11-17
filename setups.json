@@ -5,6 +5,7 @@
     "jitter": true,
     "collision_delay": "3.0",
     "hotkey": "SPACE",
+    "hotkey_target_only": true,
     "keys": [
       {
         "key": "F4",
@@ -26,8 +27,7 @@
         "time": "8",
         "unit": "s"
       }
-    ],
-    "hotkey_target_only": true
+    ]
   },
   "Auto Pot & Buffs": {
     "name": "Auto Pot & Buffs",

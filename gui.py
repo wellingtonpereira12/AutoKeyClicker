@@ -123,6 +123,8 @@ class AutoKeyClickerApp:
 
         self.windows_cache = []
         self.selected_window = None
+        self._saved_target_exe = ""
+        self._saved_target_title = ""
         self.key_cards = []
         self.mini_key_cards = []
         self.all_setups = {}
@@ -277,11 +279,11 @@ class AutoKeyClickerApp:
         # ----------------- MINI HUD CONTAINER (Shown ONLY in Mini Mode) -----------------
         self.mini_hud_frame = tk.Frame(self.root, bg=BG_DARK, padx=10, pady=2)
 
-        # Target Window Bar
+        # Target Executable Bar
         win_bar = tk.Frame(self.body_container, bg=BG_CARD, padx=8, pady=4, bd=1, relief="solid")
         win_bar.pack(fill="x", pady=(0, 6))
 
-        tk.Label(win_bar, text="🎯 Jogo:", font=("Segoe UI", 9, "bold"), bg=BG_CARD, fg=FG_WHITE).pack(side="left", padx=(0, 6))
+        tk.Label(win_bar, text="🎯 Executável:", font=("Segoe UI", 9, "bold"), bg=BG_CARD, fg=FG_WHITE).pack(side="left", padx=(0, 6))
 
         self.window_combo = ttk.Combobox(
             win_bar,
@@ -752,7 +754,7 @@ class AutoKeyClickerApp:
 
             # Restore normal status badge text format
             if self.engine.is_running:
-                target_exe = self.selected_window['exe'] if self.selected_window else 'Jogo'
+                target_exe = self.selected_window['exe'] if self.selected_window else 'Executável'
                 active_count = len(self._get_configured_keys())
                 self.status_badge.config(text=f"● CLICANDO ({active_count} TECLAS) EM {target_exe}")
 
@@ -1285,8 +1287,19 @@ class AutoKeyClickerApp:
             messagebox.showwarning("Nenhuma Tecla", "Configure pelo menos uma tecla válida!")
             return
 
+        target_exe = ""
+        target_title = ""
+        if self.selected_window:
+            target_exe = self.selected_window.get('exe', '')
+            target_title = self.selected_window.get('title', '')
+        elif getattr(self, '_saved_target_exe', ''):
+            target_exe = self._saved_target_exe
+            target_title = getattr(self, '_saved_target_title', '')
+
         self.all_setups[name] = {
             "name": name,
+            "target_exe": target_exe,
+            "target_title": target_title,
             "mode": self.mode_var.get(),
             "jitter": self.jitter_var.get(),
             "collision_delay": self.collision_delay_var.get() if hasattr(self, 'collision_delay_var') else "3.0",
@@ -1298,7 +1311,8 @@ class AutoKeyClickerApp:
         if self._save_setups_to_disk():
             self._refresh_setups_dropdown()
             self.saved_setups_combo.set(name)
-            messagebox.showinfo("Sucesso", f"Setup '{name}' salvo!")
+            exe_msg = f" (Executável: {target_exe})" if target_exe else ""
+            messagebox.showinfo("Sucesso", f"Setup '{name}' salvo com sucesso!{exe_msg}")
 
     def _on_setup_combo_selected(self, event):
         name = self.saved_setups_combo.get().strip()
@@ -1317,6 +1331,43 @@ class AutoKeyClickerApp:
         if hasattr(self, 'hotkey_target_only_var'):
             self.hotkey_target_only_var.set(setup_data.get('hotkey_target_only', True))
             self._on_hotkey_target_only_changed()
+
+        # Restore target executable from setup
+        target_exe = setup_data.get('target_exe', '')
+        target_title = setup_data.get('target_title', '')
+        self._saved_target_exe = target_exe
+        self._saved_target_title = target_title
+
+        if target_exe:
+            if not self.windows_cache:
+                self.windows_cache = list_user_windows()
+                self.window_combo['values'] = [w['display'] for w in self.windows_cache]
+
+            matched_idx = None
+            for idx, w in enumerate(self.windows_cache):
+                if target_exe.lower() == w['exe'].lower():
+                    matched_idx = idx
+                    break
+            if matched_idx is None:
+                for idx, w in enumerate(self.windows_cache):
+                    if target_exe.lower() in w['exe'].lower() or (target_title and target_title.lower() in w['title'].lower()):
+                        matched_idx = idx
+                        break
+
+            if matched_idx is not None:
+                self.window_combo.current(matched_idx)
+                self.selected_window = self.windows_cache[matched_idx]
+                if self.is_mini_mode:
+                    self.title_lbl.config(text=f"⚡ AutoClicker [{self.selected_window['exe']}]")
+            else:
+                self.selected_window = None
+                self.window_combo.set(f"[{target_exe}] (Abra o executável e clique em 🔄)")
+                if self.is_mini_mode:
+                    self.title_lbl.config(text=f"⚡ AutoClicker [{target_exe}]")
+        else:
+            # If setup doesn't have an explicit target_exe, refresh/auto-select
+            if not self.selected_window:
+                self.refresh_windows_list()
 
         for cd in list(self.key_cards):
             cd['frame'].destroy()
@@ -1364,6 +1415,13 @@ class AutoKeyClickerApp:
                 if w['hwnd'] == current_selection:
                     self.window_combo.current(idx)
                     return
+        elif getattr(self, '_saved_target_exe', ''):
+            target_pref = self._saved_target_exe
+            for idx, w in enumerate(self.windows_cache):
+                if target_pref.lower() in w['exe'].lower():
+                    self.window_combo.current(idx)
+                    self._on_window_selected(None)
+                    return
 
     def refresh_windows_list(self):
         self.windows_cache = list_user_windows()
@@ -1371,32 +1429,62 @@ class AutoKeyClickerApp:
         self.window_combo['values'] = display_values
 
         if display_values:
-            selected_idx = 0
-            # Tier 1: Exact game client matches (RF Online game client, Ragnarok client)
-            found = False
-            for tier in [
-                ['rf_online', 'rf online', 'ragexe', 'ragnarok'],
-                ['game', 'cerberus', 'play']
-            ]:
+            selected_idx = None
+
+            # 1. First priority: match target_exe from the current setup
+            target_pref = getattr(self, '_saved_target_exe', '')
+            if not target_pref and hasattr(self, 'saved_setups_combo'):
+                cur_setup = self.saved_setups_combo.get().strip()
+                if cur_setup and cur_setup in self.all_setups:
+                    target_pref = self.all_setups[cur_setup].get('target_exe', '')
+
+            if target_pref:
                 for idx, w in enumerate(self.windows_cache):
-                    combo_str = f"{w['exe']} {w['title']}".lower()
-                    if any(g in combo_str for g in tier):
+                    if target_pref.lower() == w['exe'].lower():
                         selected_idx = idx
-                        found = True
                         break
-                if found:
-                    break
+                if selected_idx is None:
+                    for idx, w in enumerate(self.windows_cache):
+                        if target_pref.lower() in w['exe'].lower():
+                            selected_idx = idx
+                            break
+
+            # 2. Second priority: current selection if still alive
+            if selected_idx is None and self.selected_window:
+                for idx, w in enumerate(self.windows_cache):
+                    if w['hwnd'] == self.selected_window['hwnd']:
+                        selected_idx = idx
+                        break
+
+            # 3. Third priority: smart game client matching
+            if selected_idx is None:
+                for tier in [
+                    ['rf_online', 'rf online', 'ragexe', 'ragnarok'],
+                    ['game', 'cerberus', 'play']
+                ]:
+                    for idx, w in enumerate(self.windows_cache):
+                        combo_str = f"{w['exe']} {w['title']}".lower()
+                        if any(g in combo_str for g in tier):
+                            selected_idx = idx
+                            break
+                    if selected_idx is not None:
+                        break
+
+            if selected_idx is None:
+                selected_idx = 0
 
             self.window_combo.current(selected_idx)
             self._on_window_selected(None)
         else:
-            self.window_combo.set("Nenhum jogo encontrado. Clique em 🔄")
+            self.window_combo.set("Nenhum executável encontrado. Clique em 🔄")
             self.selected_window = None
 
     def _on_window_selected(self, event):
         idx = self.window_combo.current()
         if 0 <= idx < len(self.windows_cache):
             self.selected_window = self.windows_cache[idx]
+            self._saved_target_exe = self.selected_window['exe']
+            self._saved_target_title = self.selected_window['title']
             if self.is_mini_mode:
                 self.title_lbl.config(text=f"⚡ AutoClicker [{self.selected_window['exe']}]")
             self._sync_engine_config()
@@ -1408,9 +1496,10 @@ class AutoKeyClickerApp:
         if not self.selected_window or not is_window_alive(self.selected_window['hwnd']):
             self.refresh_windows_list()
             if not self.selected_window:
+                target_hint = f" '{self._saved_target_exe}'" if getattr(self, '_saved_target_exe', '') else ""
                 messagebox.showerror(
-                    "Janela Não Selecionada",
-                    "Por favor, selecione o jogo na lista antes de iniciar!"
+                    "Executável Não Selecionado",
+                    f"Por favor, selecione o executável{target_hint} na lista antes de iniciar!"
                 )
                 return
 
@@ -1451,7 +1540,7 @@ class AutoKeyClickerApp:
         def update():
             try:
                 if is_running:
-                    target_exe = self.selected_window['exe'] if self.selected_window else 'Jogo'
+                    target_exe = self.selected_window['exe'] if self.selected_window else 'Executável'
                     active_count = len(self._get_configured_keys())
                     mode_tag = " [2º Plano]" if self.mode_var.get() == "background" else " [Foco Ativo]"
                     status_txt = f"● ATIVO ({active_count}T){mode_tag}" if self.is_mini_mode else f"● CLICANDO ({active_count} TECLAS) EM {target_exe}{mode_tag}"
