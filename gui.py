@@ -1126,10 +1126,9 @@ class AutoKeyClickerApp:
         self.engine.trigger_card_reload(card_index)
 
     def _animate_tubinhos(self):
-        """Smoothly animates the cooldown tubes underneath each key card at ~30 FPS."""
+        """Smoothly animates the cooldown tubes underneath each key card at ~30 FPS with change detection."""
         try:
             progress_data = self.engine.get_progress_for_all()
-            is_running = self.engine.is_running
             now_t = time.time()
 
             # Select active cards: mini HUD cards in mini mode, or main cards in normal mode
@@ -1143,6 +1142,9 @@ class AutoKeyClickerApp:
                     if not tube_canvas or not bar_id:
                         continue
 
+                    target_w = 0
+                    target_fill = ACCENT_BLUE
+
                     if card_idx in progress_data:
                         info = progress_data[card_idx]
                         p = info.get('progress', 0.0)
@@ -1153,21 +1155,25 @@ class AutoKeyClickerApp:
                         if w > 1:
                             # 1. Visual GREEN flash when click fires (lasts 200ms)
                             if now_t - last_click < 0.20:
-                                tube_canvas.coords(bar_id, 0, 0, w, 12)
-                                tube_canvas.itemconfig(bar_id, fill=ACCENT_GREEN)
+                                target_w = w
+                                target_fill = ACCENT_GREEN
                             # 2. Yellow/Amber: waiting on anti-collision sequential delay
                             elif is_waiting:
-                                tube_canvas.coords(bar_id, 0, 0, w, 12)
-                                tube_canvas.itemconfig(bar_id, fill="#faa61a")
+                                target_w = w
+                                target_fill = "#faa61a"
                             # 3. Normal progress: filling up progressively in vibrant blue
                             else:
-                                fill_w = max(0, min(w, int(w * p)))
-                                tube_canvas.coords(bar_id, 0, 0, fill_w, 12)
-                                tube_canvas.itemconfig(bar_id, fill=ACCENT_BLUE)
-                    else:
-                        # Reset to 0 when idle/stopped
-                        tube_canvas.coords(bar_id, 0, 0, 0, 12)
-                        tube_canvas.itemconfig(bar_id, fill=ACCENT_BLUE)
+                                target_w = max(0, min(w, int(w * p)))
+                                target_fill = ACCENT_BLUE
+
+                    # Avoid redundant GDI / Tkinter canvas re-renders if unchanged
+                    prev_w = cd.get('_last_w')
+                    prev_fill = cd.get('_last_fill')
+                    if prev_w != target_w or prev_fill != target_fill:
+                        tube_canvas.coords(bar_id, 0, 0, target_w, 12)
+                        tube_canvas.itemconfig(bar_id, fill=target_fill)
+                        cd['_last_w'] = target_w
+                        cd['_last_fill'] = target_fill
         except Exception:
             pass
 

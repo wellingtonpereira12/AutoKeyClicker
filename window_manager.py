@@ -10,8 +10,31 @@ user32 = ctypes.windll.user32
 kernel32 = ctypes.windll.kernel32
 dwmapi = ctypes.windll.dwmapi
 
-# Ensure connection to interactive desktop
+# Explicit Win32 64-bit signatures to prevent pointer truncation & access violations
+user32.GetForegroundWindow.restype = wintypes.HWND
+user32.GetForegroundWindow.argtypes = []
+user32.GetAncestor.restype = wintypes.HWND
+user32.GetAncestor.argtypes = [wintypes.HWND, wintypes.UINT]
+user32.GetWindow.restype = wintypes.HWND
+user32.GetWindow.argtypes = [wintypes.HWND, wintypes.UINT]
+user32.IsWindow.restype = wintypes.BOOL
+user32.IsWindow.argtypes = [wintypes.HWND]
+user32.IsWindowVisible.restype = wintypes.BOOL
+user32.IsWindowVisible.argtypes = [wintypes.HWND]
+user32.GetWindowThreadProcessId.restype = wintypes.DWORD
+user32.GetWindowThreadProcessId.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
+user32.ShowWindow.restype = wintypes.BOOL
+user32.ShowWindow.argtypes = [wintypes.HWND, ctypes.c_int]
+user32.SetForegroundWindow.restype = wintypes.BOOL
+user32.SetForegroundWindow.argtypes = [wintypes.HWND]
+
+_desktop_ensured = False
+
+# Ensure connection to interactive desktop (run once safely)
 def ensure_interactive_desktop():
+    global _desktop_ensured
+    if _desktop_ensured:
+        return
     try:
         hwinsta = user32.OpenWindowStationW('WinSta0', False, 0x10000000)
         if hwinsta:
@@ -19,6 +42,7 @@ def ensure_interactive_desktop():
             hdesk = user32.OpenDesktopW('Default', 0, False, 0x10000000)
             if hdesk:
                 user32.SetThreadDesktop(hdesk)
+        _desktop_ensured = True
     except Exception:
         pass
 
@@ -152,7 +176,6 @@ def is_target_window_active(target_hwnd):
     if not target_hwnd or not is_window_alive(target_hwnd):
         return False
     try:
-        ensure_interactive_desktop()
         fg_hwnd = user32.GetForegroundWindow()
         if not fg_hwnd:
             return False

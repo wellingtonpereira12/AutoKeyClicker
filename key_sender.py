@@ -9,8 +9,13 @@ import time
 
 user32 = ctypes.windll.user32
 
-# Ensure connection to interactive desktop
+_desktop_ensured = False
+
+# Ensure connection to interactive desktop (run once safely)
 def ensure_interactive_desktop():
+    global _desktop_ensured
+    if _desktop_ensured:
+        return
     try:
         hwinsta = user32.OpenWindowStationW('WinSta0', False, 0x10000000)
         if hwinsta:
@@ -18,6 +23,7 @@ def ensure_interactive_desktop():
             hdesk = user32.OpenDesktopW('Default', 0, False, 0x10000000)
             if hdesk:
                 user32.SetThreadDesktop(hdesk)
+        _desktop_ensured = True
     except Exception:
         pass
 
@@ -149,8 +155,7 @@ def send_key_background(hwnd, key_str, hold_ms=35):
     Sends a keystroke directly to a window handle in the BACKGROUND.
     Does not steal focus or move the cursor!
     """
-    ensure_interactive_desktop()
-    if not user32.IsWindow(hwnd):
+    if not hwnd or not user32.IsWindow(hwnd):
         return False
 
     vk, scancode = resolve_key(key_str)
