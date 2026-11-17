@@ -1372,10 +1372,19 @@ class AutoKeyClickerApp:
 
         if display_values:
             selected_idx = 0
-            for idx, w in enumerate(self.windows_cache):
-                combo_str = f"{w['exe']} {w['title']}".lower()
-                if any(g in combo_str for g in ['ragnarok', 'ragexe', 'rf_online', 'rf online', 'cerberus', 'game', 'play']):
-                    selected_idx = idx
+            # Tier 1: Exact game client matches (RF Online game client, Ragnarok client)
+            found = False
+            for tier in [
+                ['rf_online', 'rf online', 'ragexe', 'ragnarok'],
+                ['game', 'cerberus', 'play']
+            ]:
+                for idx, w in enumerate(self.windows_cache):
+                    combo_str = f"{w['exe']} {w['title']}".lower()
+                    if any(g in combo_str for g in tier):
+                        selected_idx = idx
+                        found = True
+                        break
+                if found:
                     break
 
             self.window_combo.current(selected_idx)
