@@ -130,7 +130,7 @@ def list_user_windows():
 
         # Owned child windows (dialogs, tooltips, popup subwindows)
         owner = user32.GetWindow(hwnd, GW_OWNER)
-        if owner != 0:
+        if owner:
             return True
 
         # Check window size (ignore invisible 0x0 or 1x1 helper windows)
@@ -143,9 +143,12 @@ def list_user_windows():
 
         pid = wintypes.DWORD()
         user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+        if pid.value == kernel32.GetCurrentProcessId():
+            return True
+
         exe_name = get_process_name(pid.value)
 
-        if exe_name.lower() in SYSTEM_EXES_IGNORE:
+        if exe_name.lower() in SYSTEM_EXES_IGNORE or exe_name.lower() == 'autokeyclicker.exe':
             return True
 
         display_name = f"[{exe_name}]  {title}"
@@ -166,6 +169,8 @@ def list_user_windows():
     return results
 
 def is_window_alive(hwnd):
+    if not hwnd:
+        return False
     return bool(user32.IsWindow(hwnd))
 
 def is_target_window_active(target_hwnd):

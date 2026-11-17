@@ -1373,8 +1373,8 @@ class AutoKeyClickerApp:
         if display_values:
             selected_idx = 0
             for idx, w in enumerate(self.windows_cache):
-                name_low = w['exe'].lower()
-                if any(g in name_low for g in ['ragnarok', 'ragexe', 'rf_online', 'game']):
+                combo_str = f"{w['exe']} {w['title']}".lower()
+                if any(g in combo_str for g in ['ragnarok', 'ragexe', 'rf_online', 'rf online', 'cerberus', 'game', 'play']):
                     selected_idx = idx
                     break
 
